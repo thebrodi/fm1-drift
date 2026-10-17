@@ -210,7 +210,7 @@ more than 8 voices, never silent while the pad plays, silent 30–40 s after a s
 the file. Known rough edge: with GLOW at its maximum, OCT+ and a high ECHO, a bright chord of bells can fizz for a few
 seconds (two of six random seeds catch it).
 
-`tests/drift_harmony.c` checks that everything harmonises: every world × behaviour × progression with every layer
+`tests/drift_harmony.c` checks that everything harmonises: every world × behaviour × TIDE with every layer
 on, the notes heard together sampled continuously; a semitone between two of them (a minor 2nd, a major 7th, a minor
 9th) is a clash. It passes with none. What keeps it so: every melody note sits at least a whole tone from every note of
 the chord (its root too), the flowing line also never steps a semitone from its own last, still ringing note, and a
@@ -222,7 +222,7 @@ Felucca's own suite (`tests/run_tests.sh`) passes with `FELUCCA_DRIFT=0`; with D
 MIDI-out-of-keys, SONG grid and splash keys fail, as Drift replaces those by design.
 
 To hear it without a browser, `web/emu/drift_render.c` presses PLAY, adds the layers one by one, then goes through
-the behaviours, a progression and the black-key chords, into a WAV (the build command is at the top of the file; add
+the behaviours, every TIDE, every world and the black-key chords, into a WAV (the build command is at the top of the file; add
 `-DDRIFT_TRACE` to print every note struck).
 
 ## How we build it
