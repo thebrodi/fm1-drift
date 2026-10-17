@@ -4,8 +4,8 @@
 
 A simple, dreamy ambient instrument: custom firmware for the M-VAVE FM-1 pocket synth.
 
-Press PLAY and a gentle chord progression starts and keeps going. Add and remove layers with the white keys, nudge
-the harmony with the black keys, and shape everything live with the four knobs. Every note fits, so it always sounds
+Press PLAY and a gentle chord progression starts and keeps going. Add and remove layers with the white keys, jump
+to other chords with the black keys, and shape everything live with the four knobs. Every note fits, so it always sounds
 good. No menus, no drums.
 
 > **Work in progress.** Drift runs in the browser emulator. It has not been flashed to an FM-1 yet.
@@ -20,7 +20,7 @@ good. No menus, no drums.
 | **KNOB 3 — Glow** | Dark and warm → bright and glassy |
 | **KNOB 4 — Motion** | Still and sparse → busy and moving |
 | **White keys** | Layers on / off (lit = playing): PAD, BASS, ARP, SPARKLE, MELODY, CHOIR, SHIMMER |
-| **Black keys** | Nudges: NEXT chord, HOLD this chord, BRIGHT, DARK, HOME |
+| **Black keys** | Chords to jump to (vi ii IV V I, then the same with add9): press to go, hold to stay |
 | **PRESETS** | The world: GLASS, EMBER, DUSK (sounds, key, tempo) |
 | **ALGORITHM** | The behaviour: DRIFT, RIPPLE, SWELL, CHIME, PULSE |
 | **SELECT** | The progression: DRONE, HOME, FLOAT, LONGING, RISE, WANDER |

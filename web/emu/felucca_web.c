@@ -259,6 +259,7 @@ static void cdc_task(void) {}
 #define ui_input drift_input
 #define ui_leds drift_leds
 #define ui_draw drift_draw
+#define draw_splash drift_splash
 #endif
 #include "../../firmware/src/master.c"
 #include "../../firmware/src/main.c"

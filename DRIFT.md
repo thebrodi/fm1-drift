@@ -7,8 +7,8 @@ Inspiration: the HiChord (everything you press fits) and the OP-1's generative p
 it plays on, you shape it live).
 
 **How it plays:** press PLAY and a gentle chord progression starts and keeps going. The white keys
-add and remove layers (lit = playing). The four knobs shape it live. The black keys nudge the
-harmony. PRESETS, ALGORITHM and SELECT pick the world, the behaviour and the progression. No drums.
+add and remove layers (lit = playing). The four knobs shape it live. The black keys are chords to
+jump to. PRESETS, ALGORITHM and SELECT pick the world, the behaviour and the progression. No drums.
 
 ## Rules
 
@@ -35,7 +35,7 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 | **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness) |
 | **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play; chorus and drift) |
 | **White keys** | Toggle the 7 layers, lit while on (the pattern repeats across the keyboard) |
-| **Black keys** | Nudges: NEXT, HOLD, BRIGHT, DARK, HOME (the pattern repeats across the keyboard) |
+| **Black keys** | Chords to jump to: press = go there, hold = stay, let go = the progression carries on |
 | **PRESETS** knob | The world: the sounds, the key and the tempo (a few, each complete) |
 | **ALGORITHM** knob | The behaviour: how every layer plays (DRIFT, RIPPLE, SWELL, CHIME, PULSE) |
 | **SELECT** knob | The progression: which chords the music walks through |
@@ -57,15 +57,19 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 PAD and MELODY are on at power-on. The FM-1 sounds 8 voices at once across 4 parts, so the layers
 share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), CHOIR (part 4).
 
-### Nudges (black keys)
+### Chords (black keys)
 
-| Key | Nudge |
-|---|---|
-| NEXT | The next chord now |
-| HOLD | Stay on this chord (lit while held) |
-| BRIGHT | Brighter chords: add9 colour, voiced higher (lit while on) |
-| DARK | Darker chords: the 7th, voiced lower (lit while on; BRIGHT and DARK exclude each other) |
-| HOME | Back to the first chord of the progression |
+Every black key is a chord of the key you are in, so any of them fits at any time. Press one and the
+music moves to that chord. Hold it and the music stays there. Let go and the progression carries on
+from that chord (from its place in the progression, when the progression has it).
+
+| Black keys, from the left | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| First five | vi | ii | IV | V | I |
+| Next five | vi add9 | ii add9 | IV add9 | V add9 | I add9 |
+
+The 11th black key starts the pattern again. While the music plays, the black key of the chord
+sounding now is lit, so you can see where you are.
 
 ### Behaviours (ALGORITHM)
 
@@ -89,7 +93,18 @@ GLASS (D, 72 BPM, glass pad and bells), EMBER (A, 66 BPM, warm pad and electric 
 
 ## Screen
 
-One page: world, behaviour, progression, the chord now, the layers that are on, the four knobs (the biggest\nthing on it) and a calm animated visual. Nothing to navigate.
+One page, nothing to navigate:
+
+| Where | Shows |
+|---|---|
+| Top | Play mark, world, key and tempo, octave |
+| Knob cards | SPACE, ECHO, GLOW, MOTION: each value large in its own colour, with a bar (the knobs come first) |
+| Scene | The world's picture with the sounding notes as soft lights: GLASS orbits, EMBER a drifting cloud, DUSK a dune under the moon. Turning PRESETS, ALGORITHM or SELECT shows its new name here for a moment |
+| Layers | The seven layers, a dot when on, a bar that moves as each one plays |
+| Bottom | The progression with the chord now underlined (or the chord and HELD while a black key holds it), the bars it has left, the behaviour |
+
+At power-on a splash shows a small planet and DRIFT. Colours: deep navy, with pastel sky, lilac,
+rose, mint and peach.
 
 ## Sound
 
@@ -100,7 +115,7 @@ One page: world, behaviour, progression, the chord now, the layers that are on, 
 
 ## Where it lives
 
-- `firmware/src/drift_play.c`: the music: the clock, progressions, layers and nudges (runs in the audio
+- `firmware/src/drift_play.c`: the music: the clock, progressions, layers and black-key chords (runs in the audio
   interrupt, in place of Felucca's keyboard).
 - `firmware/src/drift_ui.c`: the knobs, buttons, LEDs and the one screen (in place of Felucca's UI).
 - `FELUCCA_DRIFT` (`core.h`, on by default) switches between them; `0` builds plain Felucca.
@@ -115,7 +130,7 @@ python3 -m http.server -d build/emu 8790                                        
 ```
 
 To hear it without a browser, `web/emu/drift_render.c` presses PLAY, adds the layers one by one, then goes through
-the behaviours, a progression and the nudges, into a WAV (the build command is at the top of the file; add
+the behaviours, a progression and the black-key chords, into a WAV (the build command is at the top of the file; add
 `-DDRIFT_TRACE` to print every note struck).
 
 ## How we build it

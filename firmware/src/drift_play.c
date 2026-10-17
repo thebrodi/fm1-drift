@@ -4,7 +4,8 @@
  * Included by seq.c with FELUCCA_DRIFT. DRIFT.md has the design.
  *   PLAY: a chord progression (SELECT) walks on by itself on a sixteenth-note clock at the world's tempo.
  *   White keys: toggle the seven layers (PAD BASS ARP SPARKLE MELODY CHOIR SHIMMER), repeating across the keyboard.
- *   Black keys: nudge the harmony (NEXT HOLD BRIGHT DARK HOME), repeating across the keyboard.
+ *   Black keys: chords to jump to (vi ii IV V I from the left; the upper ones the same chords, add9): pressed, the music
+ *   moves there; held, it stays; let go, the progression carries on from there.
  *   ALGORITHM: how every layer behaves (DS_*: how long a chord lasts, how often each layer plays).
  * Every note comes from the major scale of drift_root and mostly from the chord sounding now: nothing can clash.
  * Parts: PAD and SHIMMER on part 1, ARP SPARKLE MELODY on part 2 (struck bells), BASS on 3, CHOIR on 4. The FM-1
@@ -16,8 +17,7 @@
 #define DRIFT_CHOIR 3u
 enum { DL_PAD, DL_BASS, DL_ARP, DL_SPARKLE, DL_MELODY, DL_CHOIR, DL_SHIMMER, DL_N };
 static const char *const DRIFT_LAYER[DL_N] = {"PAD", "BASS", "ARP", "SPARK", "MEL", "CHOIR", "SHIM"};
-enum { DN_NEXT, DN_HOLD, DN_BRIGHT, DN_DARK, DN_HOME, DN_N };
-static const char *const DRIFT_NUDGE[DN_N] = {"NEXT", "HOLD", "BRIGHT", "DARK", "HOME"};
+static const int8_t DRIFT_BLACK[5] = {5, 1, 3, 4, 0};   /* the chord of each black key of a group: vi ii IV V I */
 enum { DS_DRIFT, DS_RIPPLE, DS_SWELL, DS_CHIME, DS_PULSE, DS_N };
 static const char *const DRIFT_STYLE[DS_N] = {"DRIFT", "RIPPLE", "SWELL", "CHIME", "PULSE"};
 static const uint8_t DRIFT_SCALE[7] = {0, 2, 4, 5, 7, 9, 11};
@@ -57,10 +57,11 @@ static volatile uint8_t drift_root = 2;  /* the world's key (D) */
 static volatile uint8_t drift_bpm = 72;  /* the world's tempo */
 static volatile uint8_t drift_resync;    /* the UI reloaded the parts' sounds: start the held notes again */
 static volatile uint8_t drift_layers = 1u << DL_PAD | 1u << DL_MELODY;   /* the layers on (bit DL_*) */
-static volatile uint8_t drift_hold, drift_bright, drift_dark;             /* the toggled nudges */
+static volatile uint8_t drift_bright;    /* the chord now is the add9 one (an upper black key chose it) */
+static volatile uint8_t drift_pin = 0xFF;   /* the black key (its place) holding the chord, 0xFF none */
+static volatile uint8_t drift_act[DL_N]; /* each layer's activity: 255 as it plays a note, the screen lets it fade */
 static volatile int8_t drift_deg = -1;   /* the chord sounding (0..6), -1 none: the screen shows it */
 static volatile uint8_t drift_seen;      /* bumped when the chord or a toggle changes (the screen redraws) */
-static volatile uint8_t drift_flash;     /* NEXT / HOME pressed (+ 1): the screen and the LEDs show it a moment */
 
 /* ------------------------------------------------------------- notes --- */
 static int32_t drift_step(int32_t s)     /* a scale step of the key: semitones above drift_root (negative too) */
@@ -121,9 +122,10 @@ static void drift_hold_set(drift_held_t *h, const uint8_t *want, uint32_t n, uin
 #define DRIFT_STRIKE (FS / 8u)
 static uint8_t drift_bn[DRIFT_NBELL];
 static int32_t drift_bt[DRIFT_NBELL];
-static void drift_strike(uint32_t part, uint32_t note, uint32_t vel)
+static void drift_strike(uint32_t layer, uint32_t part, uint32_t note, uint32_t vel)
 {
     uint32_t i, k = 0;
+    drift_act[layer] = 255;
 #ifdef DRIFT_TRACE
     printf("%7.2f s  %-6s  part %u  note %3u  vel %3u\n", fm1_ms / 1000.0, DRIFT_STYLE[drift_style], part + 1u, note,
            vel);
@@ -160,29 +162,24 @@ static void drift_bells_block(uint32_t n)
 }
 
 /* ------------------------------------------------------------- chord --- */
-static uint8_t drift_pos;                /* the place in the progression */
+static volatile uint8_t drift_pos;       /* the place in the progression (the screen shows it) */
 static int8_t drift_cur;                 /* the chord's degree now */
 static uint8_t drift_arp, drift_burst, drift_last;
 static uint8_t drift_choir_tone = 1;     /* CHOIR: which of the chord's tones it sings */
 static uint16_t drift_mel_wait, drift_choir_wait;
-static uint32_t drift_tick;              /* sixteenths since PLAY */
+static volatile uint32_t drift_tick;     /* sixteenths since PLAY */
+static volatile uint32_t drift_since;    /* the sixteenth the chord began on (the screen counts its bars) */
 static int32_t drift_clock;              /* samples to the next sixteenth */
 
-/* the register's low edge: middle, moved by OCT and BRIGHT / DARK */
-static int32_t drift_lo(void) { return 55 + 12 * drift_oct + (drift_bright ? 5 : 0) - (drift_dark ? 7 : 0); }
+/* the register's low edge: middle, moved by OCT (and a little higher for an add9 chord) */
+static int32_t drift_lo(void) { return 55 + 12 * drift_oct + (drift_bright ? 3 : 0); }
 
-/* the chord's tones as scale steps above its degree: a triad, BRIGHT its add9 (3rd 5th 9th), DARK its 7th
- * (3rd 5th 7th; the bass has the root) -> the number of them */
+/* the chord's tones as scale steps above its degree: a triad, or its add9 (3rd 5th 9th; the bass has the root) */
 static uint32_t drift_tones(int32_t *st)
 {
     st[0] = drift_bright ? 2 : 0;
     st[1] = drift_bright ? 4 : 2;
     st[2] = drift_bright ? 8 : 4;
-    if (drift_dark) {
-        st[0] = 2;
-        st[1] = 4;
-        st[2] = 6;
-    }
     return 3;
 }
 static uint32_t drift_note(int32_t steps_above, int32_t lo)   /* a tone of the chord now, folded into [lo, lo+12) */
@@ -211,14 +208,20 @@ static void drift_voice_held(void)
         want[n] = n ? (uint8_t)(want[n - 1u] + 12u) : (uint8_t)drift_note(4, lo + 12);
         n++;
     }
+    if (n)
+        drift_act[DL_PAD] = drift_act[DL_SHIMMER] = 255;
     drift_hold_set(&drift_pad, want, n, 80);
     n = 0;
     if (drift_run && (drift_layers >> DL_BASS) & 1u)
         want[n++] = (uint8_t)drift_note(0, lo - 22);
+    if (n)
+        drift_act[DL_BASS] = 255;
     drift_hold_set(&drift_bass, want, n, 90);
     n = 0;
     if (drift_run && (drift_layers >> DL_CHOIR) & 1u)
         want[n++] = (uint8_t)drift_note(st[drift_choir_tone % 3u], lo);
+    if (n)
+        drift_act[DL_CHOIR] = 255;
     drift_hold_set(&drift_choir, want, n, 76);
 }
 
@@ -238,16 +241,52 @@ static void drift_advance(void)
             drift_pos = 0;
         drift_cur = p[drift_pos];
     }
+    drift_bright = 0;
+    drift_since = drift_tick;
     drift_deg = drift_cur;
     drift_seen++;
 }
 
+/* a black key: to chord d now (bright: its add9), the progression's place moved to it when it has it */
+static void drift_jump(int32_t d, uint32_t bright)
+{
+    const int8_t *p = PROG[drift_prog % DP_N];
+    uint32_t i;
+    for (i = 0; i < 5u && p[i] >= 0; i++)
+        if (p[i] == d) {
+            drift_pos = (uint8_t)i;
+            break;
+        }
+    drift_cur = (int8_t)d;
+    drift_bright = (uint8_t)bright;
+    drift_since = drift_tick;
+    drift_deg = drift_cur;
+    drift_seen++;
+    drift_voice_held();
+}
+
 /* --------------------------------------------------------------- keys --- */
 static uint32_t drift_keys;              /* the keys as the last block saw them */
+
+/* 1 = the black key at place p is held */
+static int drift_black_held(uint32_t keys, uint32_t p)
+{
+    uint32_t k;
+    for (k = 0; k < 27u; k++)
+        if (((keys >> k) & 1u) && key_black(k) && key_place(k) == p)
+            return 1;
+    return 0;
+}
+
 static void drift_keys_block(void)
 {
     uint32_t cur = fm1_in.notes, down = cur & ~drift_keys, k;
     drift_keys = cur;
+    if (drift_pin != 0xFF && !drift_black_held(cur, drift_pin)) {   /* let go: the chord lasts its length from now */
+        drift_pin = 0xFF;
+        drift_since = drift_tick;
+        drift_seen++;
+    }
     for (k = 0; down && k < 27u; k++) {
         uint32_t p;
         if (!((down >> k) & 1u))
@@ -255,36 +294,13 @@ static void drift_keys_block(void)
         p = key_place(k);
         if (!key_black(k)) {                             /* a layer on / off */
             drift_layers ^= (uint8_t)(1u << (p % DL_N));
-        } else {
-            switch (p % DN_N) {
-            case DN_NEXT:
-                if (drift_run)
-                    drift_advance();
-                drift_flash = DN_NEXT + 1u;
-                break;
-            case DN_HOLD:
-                drift_hold = !drift_hold;
-                break;
-            case DN_BRIGHT:
-                drift_bright = !drift_bright;
-                drift_dark = 0;
-                break;
-            case DN_DARK:
-                drift_dark = !drift_dark;
-                drift_bright = 0;
-                break;
-            default:                                     /* HOME */
-                drift_pos = 0;
-                drift_cur = PROG[drift_prog % DP_N][0];
-                drift_deg = drift_run ? drift_cur : -1;
-                drift_flash = DN_HOME + 1u;
-                break;
-            }
+            drift_voice_held();
+        } else if (drift_run) {                          /* a chord: there now, and held while the key is */
+            drift_pin = (uint8_t)p;
+            drift_jump(DRIFT_BLACK[p % 5u], p >= 5u);
         }
         drift_seen++;
     }
-    if (down)
-        drift_voice_held();
 }
 
 /* ------------------------------------------------------------ player --- */
@@ -297,24 +313,24 @@ static void drift_sixteenth(void)
     int32_t lo = drift_lo(), st[3];
     uint32_t q = drift_tick % 16u, L = drift_layers;
     drift_tones(st);
-    if (drift_tick && q == 0u && !drift_hold && drift_tick % (16u * b->bars) == 0u) {   /* a new chord */
+    if (q == 0u && drift_pin == 0xFF && drift_tick - drift_since >= 16u * b->bars) {   /* a new chord (on a bar) */
         drift_advance();
         drift_voice_held();
     }
     if (((L >> DL_ARP) & 1u) && drift_tick % b->arp_div == 0u) {   /* ARP: up and back down the chord, two octaves */
         uint32_t a = drift_arp % 10u, k = a < 6u ? a : 10u - a;      /* 0 1 2 3 4 5 4 3 2 1: tone k % 3, octave k / 3 */
         if (q == 0u || drift_chance(b->arp_p, 128u))
-            drift_strike(DRIFT_BELL, drift_note(st[k % 3u], lo + 2) + 12u * (k / 3u), q % 4u ? 40u + drift_rand(14u)
-                                                                                              : 58u);
+            drift_strike(DL_ARP, DRIFT_BELL, drift_note(st[k % 3u], lo + 2) + 12u * (k / 3u),
+                         q % 4u ? 40u + drift_rand(14u) : 58u);
         drift_arp++;
     }
     if ((L >> DL_SPARKLE) & 1u) {                        /* SPARKLE: high and quiet, now and then (in bursts) */
         if (drift_burst) {
             drift_burst--;
-            drift_strike(DRIFT_BELL, drift_note(st[drift_rand(3u)], lo + 24), 34u + drift_rand(20u));
+            drift_strike(DL_SPARKLE, DRIFT_BELL, drift_note(st[drift_rand(3u)], lo + 24), 34u + drift_rand(20u));
         } else if (drift_chance(b->spk_p, 1024u)) {
             drift_burst = (uint8_t)(b->spk_burst - 1u);
-            drift_strike(DRIFT_BELL, drift_note(st[drift_rand(3u)], lo + 24), 38u + drift_rand(24u));
+            drift_strike(DL_SPARKLE, DRIFT_BELL, drift_note(st[drift_rand(3u)], lo + 24), 38u + drift_rand(24u));
         }
     }
     if ((L >> DL_MELODY) & 1u && (!drift_mel_wait || !--drift_mel_wait)) {   /* MELODY: a note, then a rest */
@@ -327,7 +343,7 @@ static void drift_sixteenth(void)
         }
         drift_last = (uint8_t)n;
         if (drift_chance(100u, 128u))
-            drift_strike(DRIFT_BELL, n, 52u + drift_rand(20u));
+            drift_strike(DL_MELODY, DRIFT_BELL, n, 52u + drift_rand(20u));
         drift_mel_wait = (uint16_t)(b->mel_min + drift_rand(b->mel_max - b->mel_min + 1u));
     }
     if ((L >> DL_CHOIR) & 1u && (!drift_choir_wait || !--drift_choir_wait)) {  /* CHOIR: glides to another tone */
@@ -336,7 +352,7 @@ static void drift_sixteenth(void)
         drift_choir_wait = b->choir_every;
     }
     if (b->bass_pulse && (L >> DL_BASS) & 1u && q % 4u == 0u && drift_bass.n)   /* PULSE: the bass on the quarters */
-        drift_strike(DRIFT_BASS, drift_bass.note[0], q ? 70u : 92u);
+        drift_strike(DL_BASS, DRIFT_BASS, drift_bass.note[0], q ? 70u : 92u);
     drift_tick++;
 }
 
@@ -353,6 +369,9 @@ static void drift_player(uint32_t n)
         drift_tick = 0;
         drift_clock = 0;
         drift_pos = 0;
+        drift_since = 0;
+        drift_pin = 0xFF;
+        drift_bright = 0;
         drift_mel_wait = 2;
         drift_choir_wait = 0;
         drift_cur = PROG[drift_prog % DP_N][0];
@@ -372,17 +391,15 @@ static void drift_player(uint32_t n)
 /* each audio block, before the voices */
 static void drift_block(uint32_t n)
 {
-    static int8_t oct, bright, dark;
+    static int8_t oct;
     if (kb_boot_hold) {                                  /* (main.c: under the splash the keys are silent) */
         drift_keys = fm1_in.notes;
         return;
     }
     drift_bells_block(n);
     drift_keys_block();
-    if (oct != drift_oct || bright != drift_bright || dark != drift_dark) {   /* the register moved: the held notes */
+    if (oct != drift_oct) {                              /* the register moved: the held notes */
         oct = drift_oct;
-        bright = (int8_t)drift_bright;
-        dark = (int8_t)drift_dark;
         drift_voice_held();
     }
     drift_player(n);

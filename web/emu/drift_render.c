@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
 /* DRIFT, heard without a browser: the browser build (felucca_web.c) compiled natively, pressing PLAY, adding the layers
- * one by one, then each behaviour, a progression and the nudges (it prints when each starts), written as a 16-bit
+ * one by one, then each behaviour, a progression and the black-key chords (it prints when each starts), written as a 16-bit
  * stereo WAV, with its peak and RMS printed.
  *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -o build/drift_render web/emu/drift_render.c -lm
  *   build/drift_render OUT.wav */
@@ -36,8 +36,9 @@ static void render(double ms)
 static void put32(uint32_t v) { fputc(v & 255, out); fputc(v >> 8 & 255, out); fputc(v >> 16 & 255, out); fputc(v >> 24, out); }
 static void put16(uint32_t v) { fputc(v & 255, out); fputc(v >> 8 & 255, out); }
 
-/* the white key of layer l and the black key of nudge j (keys from F3 = 0; the first octave's) */
-static const uint8_t WHITE[7] = {0, 2, 4, 6, 7, 9, 11}, BLACK[5] = {1, 3, 5, 8, 10};
+/* the white key of layer l and the black key at place j (keys from F3 = 0): places 0..4 vi ii IV V I, 5..9 the same
+ * chords add9 */
+static const uint8_t WHITE[7] = {0, 2, 4, 6, 7, 9, 11}, BLACK[10] = {1, 3, 5, 8, 10, 13, 15, 17, 20, 22};
 static void tap(uint32_t k)
 {
     web_keys(1u << k);
@@ -85,16 +86,14 @@ int main(int argc, char **argv)
     }
     drift_style = DS_RIPPLE;
     drift_prog = 3;
-    mark("RIPPLE, LONGING; then BRIGHT, NEXT, DARK, HOLD");
+    mark("RIPPLE, LONGING; then V held 6 s on a black key, then vi add9 tapped");
     render(8000);
-    tap(BLACK[DN_BRIGHT]);
+    web_keys(1u << BLACK[3]);
     render(6000);
-    tap(BLACK[DN_NEXT]);
-    render(4000);
-    tap(BLACK[DN_DARK]);
-    render(6000);
-    tap(BLACK[DN_HOLD]);
-    render(6000);
+    web_keys(0);
+    render(3000);
+    tap(BLACK[5]);
+    render(9000);
     mark("stop");
     play();
     render(5000);                                  /* the tails */
