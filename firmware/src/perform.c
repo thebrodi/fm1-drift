@@ -67,6 +67,13 @@ enum { PF_R8, PF_R16, PF_R32, PF_REV, PF_LPF, PF_HPF, PF_TAPE, PF_FRZ, PF_OUP, P
 #define HB_FB 269                             /* .. KNOB 4 (0 .. 100) -> the shimmer, Q15: 0 .. 0.82 */
 #define PF_TOP (63 << 8)                      /* filter cutoff index, Q8 (PF_SVF): the LPF's open end */
 #define PF_LOW (14 << 8)                      /* .. the LPF sweep's end, the HPF sweep's (and K1's) top */
+#if FELUCCA_DRIFT
+#ifndef PF_LPF_END
+#define PF_LPF_END (22 << 8)                  /* DRIFT: the LPF sweep ends clearly muffled, not at the bottom (14) */
+#endif
+#else
+#define PF_LPF_END PF_LOW
+#endif
 enum { BM_NONE, BM_LOOP, BM_TAPE, BM_FRZ, BM_HARM };
 #define FL_LEN 356u                           /* FLANGER: its line's frames (8.1 ms: FL_MAX + 2) */
 #define FL_MIN 22u                            /* .. the delay's sweep, samples: 0.5 .. 8 ms */
@@ -334,7 +341,7 @@ static __attribute__((noinline)) int perf_begin(uint32_t n)
         pf.ht = (pf.act & PF_BIT(PF_HPF)) ? pf.ht + n : 0u;
         if (pf.lt) {
             t = pf.lt < bar ? pf.lt : bar;
-            lt = PF_TOP - (int32_t)((uint32_t)(PF_TOP - PF_LOW) / 64u * (t * 64u / bar));
+            lt = PF_TOP - (int32_t)((uint32_t)(PF_TOP - PF_LPF_END) / 64u * (t * 64u / bar));
         }
         if (m < 0 && PF_TOP + m * (PF_TOP - PF_LOW) / 100 < lt)
             lt = PF_TOP + m * (PF_TOP - PF_LOW) / 100;

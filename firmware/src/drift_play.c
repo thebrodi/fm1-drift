@@ -8,8 +8,9 @@
  *   moves there; held, it stays; let go, the progression carries on from there.
  *   ALGORITHM: how every layer behaves (DS_*: how long a chord lasts, how often each layer plays).
  *   FX SCL ENV LFO EDIT GLO: punch-in effects on the whole sound while held (Felucca's perform.c effects, on the master):
- *   TAPE STOP, STUTTER (REPEAT 1/16), FREEZE, SHIMMER (OCT UP), UNDERWATER (the LPF sweeping down over a bar), WASH
- *   (REV THROW).
+ *   ECHOES (ECHO THROW), STUTTER (REPEAT 1/16), FREEZE, SHIMMER (OCT UP), UNDERWATER (the LPF sweeping down over a bar,
+ *   to a soft muffle: perform.c PF_LPF_END), WASH (REV THROW). While the music plays they snap to the beat: a press
+ *   starts its effect on the next beat, a release ends it at the end of the beat it is in (a tap: one beat).
  * Every note comes from the scale of the world (major or natural minor, from drift_root) and mostly from the chord
  * sounding now: nothing can clash.
  * Parts: PAD and SHIMMER on part 1, ARP SPARKLE MELODY on part 2 (struck bells), BASS on 3, CHOIR on 4. The FM-1
@@ -30,8 +31,8 @@ static const char *const DRIFT_STYLE[DS_N] = {"DRIFT", "RIPPLE", "SWELL", "CHIME
 #define DP_NPUNCH 6u
 static volatile uint32_t drift_punch_bit[DP_NPUNCH];   /* the buttons' bits in fm1_in.buttons (drift_ui.c sets them:
                                                          * FX SCL ENV LFO EDIT GLO; panel.c comes after this file) */
-static const uint8_t DRIFT_PUNCH[DP_NPUNCH] = {PF_TAPE, PF_R16, PF_FRZ, PF_OUP, PF_LPF, PF_RTHR};
-static const char *const DRIFT_PUNCH_NAME[DP_NPUNCH] = {"TAPE STOP", "STUTTER", "FREEZE", "SHIMMER", "UNDERWATER", "WASH"};
+static const uint8_t DRIFT_PUNCH[DP_NPUNCH] = {PF_ETHR, PF_R16, PF_FRZ, PF_OUP, PF_LPF, PF_RTHR};
+static const char *const DRIFT_PUNCH_NAME[DP_NPUNCH] = {"ECHOES", "STUTTER", "FREEZE", "SHIMMER", "UNDERWATER", "WASH"};
 static const uint8_t DRIFT_SCALE[2][7] = {{0, 2, 4, 5, 7, 9, 11}, {0, 2, 3, 5, 7, 8, 10}};   /* major, natural minor */
 
 /* ------------------------------------------------------- progressions --- */
@@ -88,7 +89,9 @@ static volatile uint8_t drift_pin = 0xFF;   /* the black key (its place) holding
 static volatile uint8_t drift_act[DL_N]; /* each layer's activity: 255 as it plays a note, the screen lets it fade */
 static volatile int8_t drift_deg = -1;   /* the chord sounding (0..6), -1 none: the screen shows it */
 static volatile uint8_t drift_seen;      /* bumped when the chord or a toggle changes (the screen redraws) */
-static volatile uint8_t drift_punch;     /* the punch-in effects held (bit per button of DRIFT_PUNCH_BTN) */
+static volatile uint8_t drift_punch;     /* the punch-in effects playing (bit per button of DRIFT_PUNCH_BTN) */
+static uint8_t drift_punch_want;         /* .. the buttons down; drift_punch follows on the beat (drift_punch_sync) */
+static uint8_t drift_punch_tap;          /* pressed since the last beat: plays at least that beat, even if let go */
 
 /* ------------------------------------------------------------- notes --- */
 static int32_t drift_step(int32_t s)     /* a scale step of the key: semitones above drift_root (negative too) */
@@ -355,6 +358,19 @@ static void drift_keys_block(void)
     }
 }
 
+/* the punch-in effects playing -> `want` (bit per button): each that changes pressed or let go (perform.c) */
+static void drift_punch_sync(uint32_t want)
+{
+    uint32_t i, b;
+    for (i = 0; i < DP_NPUNCH; i++)
+        if ((b = 1u << i) & (want ^ drift_punch))
+            perf_press(DRIFT_PUNCH[i], (want & b) != 0u);
+    if (want != drift_punch) {
+        drift_punch = (uint8_t)want;
+        drift_seen++;
+    }
+}
+
 /* ------------------------------------------------------------ player --- */
 static uint8_t drift_was_run;
 
@@ -446,6 +462,10 @@ static void drift_sixteenth(void)
         drift_advance();
         drift_voice_held();
     }
+    if (q % 4u == 0u) {                                  /* a beat: the punch-ins held now play it; let go, they end */
+        drift_punch_sync(drift_punch_want | drift_punch_tap);
+        drift_punch_tap = 0;
+    }
     drift_tones(st);
     if (((L >> DL_ARP) & 1u) && drift_tick % b->arp_div == 0u) {   /* ARP: up and back down the chord, two octaves */
         uint32_t a = drift_arp % 10u, k = a < 6u ? a : 10u - a;      /* 0 1 2 3 4 5 4 3 2 1: tone k % 3, octave k / 3 */
@@ -515,18 +535,15 @@ static void drift_block(uint32_t n)
     }
     drift_bells_block(n);
     drift_keys_block();
-    {   /* the punch-in buttons: each holds its effect while it is down */
-        uint32_t i, b, down = 0;
+    {   /* the punch-in buttons: playing, they wait for the beat (drift_sixteenth); stopped, they act at once */
+        uint32_t i, down = 0;
         for (i = 0; i < DP_NPUNCH; i++)
             if (fm1_in.buttons & drift_punch_bit[i])
                 down |= 1u << i;
-        for (i = 0; i < DP_NPUNCH; i++)
-            if ((b = 1u << i) & (down ^ drift_punch))
-                perf_press(DRIFT_PUNCH[i], (down & b) != 0u);
-        if (down != drift_punch) {
-            drift_punch = (uint8_t)down;
-            drift_seen++;
-        }
+        drift_punch_tap |= (uint8_t)(down & ~drift_punch_want);
+        drift_punch_want = (uint8_t)down;
+        if (!drift_run)
+            drift_punch_sync(drift_punch_want);
     }
     if (oct != drift_oct) {                              /* the register moved: the held notes */
         oct = drift_oct;

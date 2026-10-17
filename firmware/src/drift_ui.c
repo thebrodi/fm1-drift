@@ -251,7 +251,7 @@ static void drift_input(void)
 
 /* -------------------------------------------------------------- LEDs --- */
 /* white keys: lit while their layer plays; black keys: lit while held, and the one whose chord sounds now; every key
- * glows dimly; PLAY green while the music plays; OCT- / OCT+ lit while shifted */
+ * is dimly lit; PLAY green while the music plays; OCT- / OCT+ lit while shifted */
 static void drift_leds(void)
 {
     uint8_t nl[FM1_NCOL] = {0}, nd[FM1_NCOL] = {0};
@@ -295,7 +295,7 @@ static void drift_leds(void)
  *     8  the three choices: the world (PRESETS), the progression (SELECT), the behaviour (ALGORITHM)
  *    34  the chord now
  *    60  the seven layers, underlined while on
- *    84  the sounding notes as soft lights over a slow horizon
+ *    84  the world's quiet picture, the sounding notes in it as solid lights
  *   182  the four knobs: name and bar, each in its colour
  *   222  key and tempo, octave
  * Each line redraws only when it changes; the lights at ~30 frames a second. */
@@ -323,68 +323,63 @@ static const char *const DRIFT_KEYNAME[12] = {"C", "C#", "D", "D#", "E", "F", "F
 static const uint16_t DRIFT_KCOL[DK_N] = {D_SKY, D_LILAC, D_ROSE, D_MINT};
 static const uint16_t DRIFT_PCOL[NPART] = {D_SKY, D_PEACH, D_VIOLET, D_LILAC};   /* the parts' lights */
 
-/* a light added onto the canvas: colour c at a / 32, the channels saturating */
-static void d_add(int32_t x, int32_t y, uint16_t c, uint32_t a)
+/* colour c at strength a / 32 over the background: solid, its tone dimmer for a smaller a (a >= 11: c itself) */
+static uint16_t d_tone(uint16_t c, uint32_t a)
 {
-    uint32_t i, o, r, g, b;
-    if ((uint32_t)x >= cv_w || (uint32_t)y >= cv_h || !a)
-        return;
-    i = (uint32_t)y * cv_w + (uint32_t)x;
-    o = swap16(cv_px[i]);
-    r = ((o >> 11) & 31u) + (((c >> 11) & 31u) * a >> 5);
-    g = ((o >> 5) & 63u) + (((c >> 5) & 63u) * a >> 5);
-    b = (o & 31u) + ((c & 31u) * a >> 5);
-    cv_px[i] = swap16((r > 31u ? 31u : r) << 11 | (g > 63u ? 63u : g) << 5 | (b > 31u ? 31u : b));
+    uint32_t pct = a * 300u / 32u;
+    return pct >= 100u ? c : ux_mix(D_BG, c, (int32_t)pct);
 }
 
-/* a soft round light: a / 32 at the centre, falling off to nothing at radius r */
-static void d_glow(int32_t cx, int32_t cy, int32_t r, uint16_t c, uint32_t a)
+/* a solid dot */
+static void d_dot(int32_t x, int32_t y, uint16_t c, uint32_t a)
 {
-    int32_t x, y, rr = r * r;
+    if (a)
+        cv_pset(x, y, d_tone(c, a));
+}
+
+/* a solid disc of radius r, its edge smoothed over a pixel */
+static void d_disc(int32_t cx, int32_t cy, int32_t r, uint16_t c, uint32_t a)
+{
+    int32_t x, y, r2 = r * r, ri = (r - 1) * (r - 1);
+    uint16_t t = d_tone(c, a);
     for (y = -r; y <= r; y++)
         for (x = -r; x <= r; x++) {
-            int32_t d = x * x + y * y;
-            if (d < rr)
-                d_add(cx + x, cy + y, c, a * (uint32_t)(rr - d) * (uint32_t)(rr - d) / (uint32_t)(rr * rr));
+            int32_t d = x * x + y * y, px = cx + x, py = cy + y + cv_oy;
+            if (d > r2 || (uint32_t)px >= cv_w || (uint32_t)py >= cv_h)
+                continue;
+            if (d <= ri)
+                cv_px[(uint32_t)py * cv_w + (uint32_t)px] = swap16(t);
+            else                                         /* the rim: half over what is there */
+                cv_px[(uint32_t)py * cv_w + (uint32_t)px] = swap16(ux_mix(swap16(cv_px[(uint32_t)py * cv_w + (uint32_t)px]),
+                                                                          t, 50));
         }
 }
 
-/* ---- the lights: the sounding voices as soft lights, each world with its own quiet picture behind them and its own
+/* ---- the lights: the sounding voices as solid lights, each world with its own quiet picture behind them and its own
  * way of moving them (one sentence each in DRIFT.md). Lights across by pitch, their size and brightness their level.
- * Only thin dots and lines and soft lights: nothing busy ---- */
+ * Only thin dots and lines and solid discs: nothing busy ---- */
 static uint32_t viz_ph;                  /* one step a drawn frame (~30 a second) */
 static int32_t v_sin(uint32_t a, int32_t amp) { return SINE[a & 1023u] * amp / 32768; }
 
-/* a soft line across, from x0 to x1 at row y: a / 32 on the row, fading over the two rows each side */
-static void d_hglow(int32_t x0, int32_t x1, int32_t y, uint16_t c, uint32_t a)
+/* a solid line across, from x0 to x1 at row y */
+static void d_hline(int32_t x0, int32_t x1, int32_t y, uint16_t c, uint32_t a)
 {
-    int32_t x;
-    for (x = x0; x < x1; x++) {
-        d_add(x, y, c, a);
-        d_add(x, y - 1, c, a / 2u);
-        d_add(x, y + 1, c, a / 2u);
-        d_add(x, y - 2, c, a / 6u);
-        d_add(x, y + 2, c, a / 6u);
-    }
+    if (x1 > x0)
+        cv_rect(x0, y, x1 - x0, 1, d_tone(c, a));
 }
 
-/* a soft dotted line between two points (every 3 px a faint light) */
+/* a solid line between two points */
 static void d_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c, uint32_t a)
 {
-    int32_t dx = x1 - x0, dy = y1 - y0, n = (dx < 0 ? -dx : dx) > (dy < 0 ? -dy : dy) ? (dx < 0 ? -dx : dx) : (dy < 0 ? -dy : dy), k;
-    for (k = 0; k <= n; k += 3) {
-        int32_t x = n ? x0 + dx * k / n : x0, y = n ? y0 + dy * k / n : y0;
-        d_add(x, y, c, a);
-        d_add(x + 1, y, c, a / 3u);
-        d_add(x, y + 1, c, a / 3u);
-    }
+    cv_line(x0, y0, x1, y1, d_tone(c, a));
 }
 
-static void viz_ring(int32_t cx, int32_t cy, int32_t rx, int32_t ry, uint16_t c, uint32_t a)   /* a dotted ellipse */
+/* a dotted ellipse */
+static void viz_ring(int32_t cx, int32_t cy, int32_t rx, int32_t ry, uint16_t c, uint32_t a)
 {
     uint32_t k, n = rx < 8 ? 16u : 48u;
     for (k = 0; k < n; k++)
-        d_add(cx + v_sin(k * 1024u / n + 256u, rx), cy + v_sin(k * 1024u / n, ry), c, a);
+        d_dot(cx + v_sin(k * 1024u / n + 256u, rx), cy + v_sin(k * 1024u / n, ry), c, a);
 }
 
 /* the picture behind the lights */
@@ -396,23 +391,24 @@ static void viz_back(void)
     case 0:                                              /* GLASS: a thin orbit */
         viz_ring(w / 2, m, 100, 34, D_LILAC, 14);
         break;
-    case 1:                                              /* EMBER: a warm glow low down */
-        d_glow(w / 2 + v_sin(viz_ph * 2u, 30), h + 6, 46, D_PEACH, 4);
+    case 1:                                              /* EMBER: a warm line low down */
+        for (x = 0; x < w; x += 4)                       /* a low warm line, slowly breathing */
+            d_dot(x, h - 6 + v_sin((uint32_t)x * 5u + viz_ph * 2u, 3), D_PEACH, 4);
         break;
     case 3:                                              /* NIGHT: still stars, a few twinkling */
         for (i = 0; i < 34u; i++) {
             r = r * 1664525u + 1013904223u;
-            d_add((int32_t)(r >> 8) % w, (int32_t)(r >> 20) % h, D_TEXT, 3u + ((r >> 3) + viz_ph / 6u) % 5u);
+            d_dot((int32_t)(r >> 8) % w, (int32_t)(r >> 20) % h, D_TEXT, 3u + ((r >> 3) + viz_ph / 6u) % 5u);
         }
         break;
     case 4:                                              /* NEON: a horizon and a grid running toward it */
-        d_hglow(0, w, m + 6, D_ROSE, 14);
+        d_hline(0, w, m + 6, D_ROSE, 14);
         for (x = -6; x <= 6; x++)
             d_line(w / 2 + x * 8, m + 8, w / 2 + x * 44, h, D_LILAC, 6);
         for (i = 0; i < 4u; i++) {
             y = m + 6 + (int32_t)(((viz_ph / 2u + i * 16u) % 64u) * ((viz_ph / 2u + i * 16u) % 64u) / 120u);
             if (y < h)
-                d_hglow(0, w, y, D_LILAC, 4);
+                d_hline(0, w, y, D_LILAC, 4);
         }
         break;
     case 5:                                              /* LOFI: slow soft rain */
@@ -430,13 +426,14 @@ static void viz_back(void)
     case 8:                                              /* FOREST: slow mist in bands */
         for (i = 0; i < 3u; i++)
             for (x = 0; x < w; x += 2)
-                d_add(x, m - 18 + (int32_t)i * 18 + v_sin((uint32_t)x * 4u + viz_ph + i * 300u, 4), D_MINT, 3);
+                if (!(x & 3))
+                    d_dot(x, m - 18 + (int32_t)i * 18 + v_sin((uint32_t)x * 4u + viz_ph + i * 300u, 4), D_MINT, 3);
         break;
     case 2:                                              /* DUSK: the horizon, a slow wave */
     default:                                             /* GARDEN: nothing but the fireflies */
         if (drift_world == 2u)
             for (x = 0; x < w; x += 3)
-                d_add(x, m + v_sin((uint32_t)x * 6u + viz_ph * 2u, 6), D_LILAC, 7);
+                d_dot(x, m + v_sin((uint32_t)x * 6u + viz_ph * 2u, 6), D_LILAC, 7);
         break;
     }
 }
@@ -505,13 +502,13 @@ static void drift_viz(void)
             if (!v->active || (lvl = v->env_out >> 10) < 1)       /* (Q15 -> 0..32) */
                 continue;
             if (viz_place(p, i, v->note, lvl, &x, &y, &rad))
-                d_glow(x, y, rad, DRIFT_PCOL[p], (uint32_t)(10 + lvl / 2));
+                d_disc(x, y, 2 + rad / 2, DRIFT_PCOL[p], (uint32_t)(4 + lvl / 4));   /* (dimmer as it fades) */
         }
-    for (p = 0; p < DP_NPUNCH; p++)                      /* a punch-in held: its name, softly lit, in the middle */
+    for (p = 0; p < DP_NPUNCH; p++)                      /* a punch-in playing: its name in the middle */
         if ((drift_punch >> p) & 1u) {
             int32_t tw = text_w(&AF_M, DRIFT_PUNCH_NAME[p]);
-            d_hglow(120 - tw / 2 - 10, 120 + tw / 2 + 10, (int32_t)VIZ_H / 2, D_LILAC, 8);
-            cv_text(120 - tw / 2, (int32_t)VIZ_H / 2 - 9, &AF_M, DRIFT_PUNCH_NAME[p], D_TEXT);
+            cv_rrect(120 - tw / 2 - 10, (int32_t)VIZ_H / 2 - 12, tw + 20, 24, -6, D_DIM, D_BG);
+            cv_text_on(120 - tw / 2, (int32_t)VIZ_H / 2 - 9, &AF_M, DRIFT_PUNCH_NAME[p], D_TEXT, D_DIM);
             break;
         }
     cv_blit(0, VIZ_Y);
@@ -527,7 +524,7 @@ static void drift_draw_head(void)
     cv_text(8, 4, &AF_S, w->name, D_TEXT);
     cv_text(120 - text_w(&AF_S, DRIFT_PROG[drift_prog % DP_N]) / 2, 4, &AF_S, DRIFT_PROG[drift_prog % DP_N], D_TEXT);
     cv_text_r(232, 4, &AF_S, DRIFT_STYLE[drift_style % DS_N], D_TEXT, D_BG);
-    d_hglow(8, 232, 22, D_LILAC, 3);
+    cv_rect(8, 22, 224, 1, D_DIM);
     cv_blit(0, 4);
     for (s = DRIFT_KEYNAME[w->root % 12u]; *s; s++)     /* key and tempo, octave */
         b[n++] = *s;
@@ -561,18 +558,18 @@ static void drift_draw_chord(void)
         b[n] = 0;
         draw_text_line(0, 34, 240, &AF_M, b, D_TEXT, D_BG, 1);
     }
-    cv_begin(240, 24, D_BG);                             /* the layers, a soft light under each that is on */
+    cv_begin(240, 24, D_BG);                             /* the layers, underlined while on */
     for (i = 0; i < DL_N; i++) {
         uint32_t on = (drift_layers >> i) & 1u, x = 2u + i * 34u;
         cv_text((int32_t)(x + 17u) - text_w(&AF_S, DRIFT_LAYER[i]) / 2, 0, &AF_S, DRIFT_LAYER[i],
                 on ? D_TEXT : D_DIM);
         if (on)
-            d_glow((int32_t)x + 17, 19, 5, D_PEACH, 22);
+            cv_rrect((int32_t)x + 7, 18, 20, 3, -1, D_PEACH, D_BG);
     }
     cv_blit(0, 60);
 }
 
-/* a knob: its name, a soft glowing bar with a light at its end, its value */
+/* a knob: its name, a solid bar, its value */
 static void drift_draw_bar(uint32_t i)
 {
     int32_t w = 56, f = drift_knob[i] * (w - 8) / 127 + 4;
@@ -580,9 +577,8 @@ static void drift_draw_bar(uint32_t i)
     uint32_t v = (uint32_t)drift_knob[i] * 100u / 127u;
     cv_begin((uint32_t)w, 46, D_BG);
     cv_text(w / 2 - text_w(&AF_S, DRIFT_KNOB[i]) / 2, 0, &AF_S, DRIFT_KNOB[i], D_MID);
-    d_hglow(4, w - 4, 23, DRIFT_KCOL[i], 3);             /* the track, faint */
-    d_hglow(4, f, 23, DRIFT_KCOL[i], 18);                /* the value, lit */
-    d_glow(f, 23, 6, DRIFT_KCOL[i], 22);                 /* .. and a light where it ends */
+    cv_rrect(4, 20, w - 8, 6, -3, D_DIM, D_BG);          /* the track */
+    cv_rrect(4, 20, f - 4, 6, -3, DRIFT_KCOL[i], D_DIM); /* the value */
     b[0] = (char)(v >= 100u ? '1' : '0' + v / 10u);
     b[1] = (char)(v >= 100u ? '0' : '0' + v % 10u);
     b[2] = v >= 100u ? '0' : 0;
@@ -596,9 +592,9 @@ static void drift_splash(void)
 {
     lcd_fill(0, 0, 240, 240, D_BG);
     cv_begin(240, 120, D_BG);
-    d_glow(120, 40, 28, D_SKY, 14);
-    d_glow(150, 28, 6, D_ROSE, 12);
-    d_glow(84, 54, 4, D_MINT, 12);
+    d_disc(120, 40, 22, D_SKY, 32);                      /* a planet, two moons */
+    d_disc(156, 24, 5, D_ROSE, 32);
+    d_disc(82, 56, 3, D_MINT, 32);
     cv_text(120 - text_w(&AF_L, "DRIFT") / 2, 72, &AF_L, "DRIFT", D_TEXT);
     cv_blit(0, 46);
     draw_text_line(0, 176, 240, &AF_S, "DREAM FIRMWARE FOR THE FM-1", D_MID, D_BG, 1);
