@@ -27,6 +27,8 @@ static uint32_t heard(uint8_t *n, uint8_t *pt)
                 age_was[p][v] = x->age;
                 seen_ms[p][v] = fm1_ms;
             }
+            if (p == DRIFT_PAD && drift_pad_noise)       /* (a noise pad has no pitch to clash) */
+                continue;
             if (x->gate || (fm1_ms - seen_ms[p][v] < 600u && seen_ms[p][v] >= chord_ms)) {
                 n[k] = x->note;
                 pt[k++] = (uint8_t)p;
@@ -44,6 +46,7 @@ int main(int argc, char **argv)
     web_boot();
     for (i = 0; i < 44100u; i += 128u) web_render(128);
     drift_input();
+    drift_fade_in_ms = drift_fade_out_ms = 0;            /* (no fades: the music from its first block) */
     for (w = 0; w < DRIFT_NWORLDS; w++)
         for (st = 0; st < DS_N; st++)
             for (pg = 0; pg < DP_N; pg++) {

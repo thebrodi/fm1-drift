@@ -24,21 +24,22 @@ If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelto
 
 | Control | Does |
 |---|---|
-| **PLAY** | Starts / stops the music |
+| **PLAY** | Starts / stops the music, fading in and out over 8 s |
 | **KNOB 1 — Space** | Reverb, from a small room to a huge hall |
 | **KNOB 2 — Echo** | Delay repeats |
 | **KNOB 3 — Glow** | Dark and warm → bright and glassy |
 | **KNOB 4 — Motion** | Still and sparse → busy and moving |
 | **White keys** | Layers on / off (lit = playing): PAD, BASS, ARP, SPARKLE, MELODY, VOX, SHIMMER |
 | **Black keys** | Chords to jump to (vi ii IV V I, then the same with add9): press to go, hold to stay, let go to carry on |
-| **PRESETS** | The world: GLASS, EMBER, DUSK, NIGHT, NEON, LOFI, BOWLS, GARDEN, FOREST (sounds, key, tempo) |
+| **PRESETS** | The world: GLASS, EMBER, DUSK, NIGHT, NEON, LOFI, BOWLS, GARDEN, FOREST, OCEAN, RAIN, CAVE, HANDPAN, CRYSTAL |
 | **ALGORITHM** | The behaviour: DRIFT, RIPPLE, SWELL, CHIME, PULSE |
 | **SELECT** | The progression: DRONE, HOME, FLOAT, LONGING, RISE, WANDER |
 | **OCT− / OCT+** | Everything an octave down / up |
 | **FX SCL ENV LFO EDIT GLO** | Punch-in effects while held, on the beat: echoes, stutter, freeze, shimmer, underwater, wash |
 
 The worlds range from glassy bells and warm electric piano to a dark minor pad, 80s strings, lo-fi keys, a singing
-bowl over a drone, a kalimba and a soft flute. The full design and its rules are in [DRIFT.md](DRIFT.md).
+bowl over a drone, a kalimba, a soft flute, ocean waves and rain (brown noise), a deep cave, a handpan and crystal
+singing bowls. The full design and its rules are in [DRIFT.md](DRIFT.md).
 
 ## Try it in your browser
 

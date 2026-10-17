@@ -91,6 +91,26 @@ PATCHES = [
         op(ol=0),
         op(ol=0)],
         fb=0, lpms=0)),
+    # A handpan: a round fundamental, its octave and the fifth above it (the tuned partials of a hang drum), a soft
+    # thump as the hand strikes, a ring of a few seconds.
+    ("HANDPAN", voice("HANDPAN", 5, [
+        op(r=(99, 38, 26, 36), l=(99, 62, 0, 0), ol=97, kvs=2, rs=1),
+        op(r=(99, 82, 50, 60), l=(99, 0, 0, 0), ol=58, fc=1, kvs=4, bp=48, rd=50, rc=0),   # the thump
+        op(r=(99, 42, 28, 38), l=(99, 55, 0, 0), ol=80, fc=2, det=8, rs=1),                # the octave
+        op(r=(99, 85, 55, 60), l=(99, 0, 0, 0), ol=40, fc=1),
+        op(r=(99, 46, 30, 40), l=(99, 50, 0, 0), ol=70, fc=3, det=6, rs=1),                # the fifth above
+        op(ol=0)],
+        fb=0, lpms=0)),
+    # A crystal singing bowl: a pure sine that swells in a little and rings very long, a pair a few cents apart for
+    # its slow beating, a faint octave.
+    ("CRYSTAL BOWL", voice("CRYS BOWL", 32, [
+        op(r=(72, 34, 30, 18), l=(99, 90, 0, 0), ol=96, det=6),
+        op(r=(72, 34, 30, 18), l=(99, 90, 0, 0), ol=92, det=9),
+        op(r=(70, 40, 34, 22), l=(99, 80, 0, 0), ol=64, fc=2, det=7),
+        op(ol=0),
+        op(ol=0),
+        op(ol=0)],
+        fb=0, lpms=0)),
     # Soft lo-fi keys: a mellow electric piano, its tine dulled, a slow wobble.
     ("SOFT KEYS", voice("SOFT KEYS", 5, [
         op(r=(95, 30, 25, 55), l=(99, 70, 0, 0), ol=96, kvs=2, rs=2),

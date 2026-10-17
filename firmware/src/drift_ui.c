@@ -22,11 +22,13 @@
 #define ENGI_FORMANT 5u
 #define ENGI_WHEEL 7u
 #define ENGI_GRAIN 8u
+#define ENGI_NOISE 11u
 enum { FM6_TINE = 0, FM6_BELL = 1, FM6_PAD = 4, FM6_MARIMBA = 5 };   /* eng_fm6.c FM6_PRESETS */
 enum { AN_SOFT_PAD = 1, AN_SQR_BASS = 2, AN_PWM_STR = 3, AN_SUB_BASS = 7, AN_STRINGS = 11 };   /* eng_analog.c's */
 enum { FO_CHOIR = 0, FO_LEAD = 1, FO_WHISPER = 3 };                                        /* eng_formant.c's */
 enum { WH_SOFT_FLUTE = 3 };                                                   /* eng_wheel.c's */
 enum { GR_SHIMMER = 3 };                                                      /* eng_grain.c's */
+enum { NZ_WIND = 0, NZ_RAIN = 1 };                                            /* eng_noise.c's */
 enum { RV_ROOM, RV_SPRING, RV_HALL };                                         /* G_RTYPE */
 enum { DT_4 = 0, DT_8 = 1, DT_8T = 4, DT_2 = 6, DT_1 = 7, DT_8D = 10, DT_4D = 12 };   /* G_DTIME (params.c N_DTIME) */
 #define NO_PATCH 0xFFu
@@ -42,6 +44,7 @@ typedef struct {
     drift_vox_t vox;                     /* the voice */
     uint8_t rtype, rdamp, dtime, dcolor; /* the room: reverb type and damping; the echo: its time and colour */
     uint8_t style, prog;                 /* the behaviour and progression it starts with (ALGORITHM, SELECT) */
+    int8_t reg;                          /* semitones the whole world sits from the middle (CAVE: lower) */
 } drift_world_t;
 #define SUB {ENGI_ANALOG, AN_SUB_BASS, NO_PATCH, 88}
 static const drift_world_t DRIFT_WORLDS[] = {
@@ -73,6 +76,21 @@ static const drift_world_t DRIFT_WORLDS[] = {
     {"FOREST", 4, 1, 58, {{ENGI_FM6, FM6_PAD, DF_AIR, 104}, {ENGI_WHEEL, WH_SOFT_FLUTE, NO_PATCH, 122}, SUB},
      {FO_WHISPER, {120, 100, 90, 0, 24, 92, 54, 0}, 0, 94},        /* a breathy "hoo", like wind */
      RV_HALL, 76, DT_4D, 44, DS_DRIFT, 5},
+    {"OCEAN", 2, 0, 54, {{ENGI_NOISE, NZ_WIND, NO_PATCH, 123}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
+     {FO_CHOIR, {100, 95, 0, -3, 40, 20, 56, 0}, -12, 86},          /* a low "ooh" under the waves */
+     RV_HALL, 80, DT_2, 36, DS_DRIFT, 2},
+    {"RAIN", 4, 1, 62, {{ENGI_NOISE, NZ_RAIN, NO_PATCH, 127}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 110}, SUB},
+     {FO_CHOIR, {127, 127, 0, -5, 18, 30, 38, 0}, -12, 93},         /* a hum through the rain */
+     RV_ROOM, 82, DT_8D, 40, DS_RIPPLE, 3},
+    {"CAVE", 9, 1, 50, {{ENGI_FM6, FM6_PAD, DF_DARK_PAD, 107}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
+     {FO_CHOIR, {0, 100, 120, -6, 50, 26, 66, 0}, -12, 90},         /* a deep choir, "aah" closing to "ooh" */
+     RV_HALL, 96, DT_1, 30, DS_SWELL, 0, -5},
+    {"HANDPAN", 2, 1, 66, {{ENGI_FM6, FM6_PAD, DF_DRONE, 102}, {ENGI_FM6, FM6_MARIMBA, DF_HANDPAN, 112}, SUB},
+     {FO_CHOIR, {100, 100, 0, -2, 44, 18, 58, 0}, 0, 86},           /* a warm "ooh" */
+     RV_HALL, 70, DT_8T, 50, DS_PULSE, 2},
+    {"CRYSTAL", 0, 0, 52, {{ENGI_FM6, FM6_PAD, DF_AIR, 107}, {ENGI_FM6, FM6_BELL, DF_CRYSTAL_BOWL, 104}, SUB},
+     {FO_CHOIR, {0, 20, 70, 4, 26, 44, 74, 0}, 12, 98},             /* an airy, high "aah" */
+     RV_HALL, 50, DT_2, 56, DS_DRIFT, 1},
 };
 #define DRIFT_NWORLDS (sizeof DRIFT_WORLDS / sizeof DRIFT_WORLDS[0])
 
@@ -80,6 +98,9 @@ enum { DK_SPACE, DK_ECHO, DK_GLOW, DK_MOTION, DK_N };
 static const char *const DRIFT_KNOB[DK_N] = {"SPACE", "ECHO", "GLOW", "MOTION"};
 static int16_t drift_knob[DK_N] = {90, 60, 56, 50};   /* 0..127 */
 static uint8_t drift_world, drift_ready;
+static uint8_t drift_world_next;
+static uint8_t drift_show;               /* a picture over the scene for a moment: 1 the behaviour's rhythm, 2 the chord path */
+static uint32_t drift_show_ms;         /* the world PRESETS has turned to (shown at once; loaded at the fade's silence) */
 static uint8_t drift_redraw = 1;         /* the whole screen */
 static uint8_t drift_head = 1;           /* the top and bottom lines */
 static uint8_t drift_bars = 0xF;         /* the knobs' bars (bit per knob) */
@@ -92,9 +113,9 @@ static void drift_glow(track_t *t, int32_t gl)
     int32_t c;
     if (t->eng_req == ENGI_FM6)
         t->p[P_E0 + 2] = (int16_t)(t == &trk[DRIFT_BELL] ? (gl - 64) / 2 : gl - 64);
-    else if (t->eng_req == ENGI_ANALOG) {
+    else if (t->eng_req == ENGI_ANALOG || t->eng_req == ENGI_NOISE) {   /* (the noise's FREQ is its E2) */
         c = drift_cut[t - trk] + (gl - 56) * 3 / 4;
-        t->p[P_E0 + 4] = (int16_t)(c < 0 ? 0 : c > 127 ? 127 : c);
+        t->p[P_E0 + (t->eng_req == ENGI_NOISE ? 2 : 4)] = (int16_t)(c < 0 ? 0 : c > 127 ? 127 : c);
     }
 }
 
@@ -119,6 +140,11 @@ static void drift_apply(void)
     pad->p[P_LD_AMP] = PAD_BEH[drift_style % DS_N].amp;
     pad->p[P_LTRIG] = 0;
     pad->p[P_ATK] = PAD_BEH[drift_style % DS_N].atk;
+    if (pad->eng_req == ENGI_NOISE) {                    /* noise: waves, swelling and falling over two bars */
+        pad->p[P_LSYNC] = 2;
+        pad->p[P_LWAVE] = 0;
+        pad->p[P_LD_AMP] = 110;
+    }
     pad->p[P_REV] = (int16_t)sp;                         /* SPACE: dry and close .. a vast hall */
     bell->p[P_REV] = (int16_t)sp;
     choir->p[P_REV] = (int16_t)sp;
@@ -152,7 +178,7 @@ static void drift_part(track_t *t, const drift_sound_t *d, int16_t atk, int16_t 
         fm6_slot[tr] = FM6_OWN;
         t->p[P_E7] = FM6_OWN;
     }
-    drift_cut[tr] = t->p[P_E0 + 4];
+    drift_cut[tr] = t->p[P_E0 + (d->engine == ENGI_NOISE ? 2 : 4)];
     t->p[P_VOICE] = V_POLY;
     t->p[P_MUTE] = 0;
     t->p[P_LEVEL] = d->level;
@@ -164,10 +190,26 @@ static void drift_part(track_t *t, const drift_sound_t *d, int16_t atk, int16_t 
 static void drift_load(uint32_t w)
 {
     const drift_world_t *d = &DRIFT_WORLDS[w % DRIFT_NWORLDS];
-    drift_world = (uint8_t)(w % DRIFT_NWORLDS);
+    drift_world = drift_world_next = (uint8_t)(w % DRIFT_NWORLDS);
     drift_part(&trk[DRIFT_PAD], &d->part[0], 72, 112, 104);     /* slow swell in, long tail out */
     if (trk[DRIFT_PAD].eng_req == ENGI_ANALOG)           /* its two oscillators 8 cents apart: a chorus, still in tune */
         trk[DRIFT_PAD].p[P_E0 + 1] = 8;
+    drift_pad_noise = trk[DRIFT_PAD].eng_req == ENGI_NOISE;
+    if (drift_pad_noise) {                               /* noise: no pitch (TRK 0); the wind brown and slowly wandering */
+        track_t *t = &trk[DRIFT_PAD];
+        t->p[P_E0 + 4] = 0;
+        if (d->part[0].preset == NZ_WIND) {
+            t->p[P_E0 + 1] = 120;                        /* COLR: brown */
+            t->p[P_E0 + 2] = drift_cut[DRIFT_PAD] = 70;  /* FREQ */
+            t->p[P_E0 + 3] = 10;                         /* RES */
+            t->p[P_E0 + 6] = 60;                         /* DRFT */
+        }
+        if (d->part[0].preset == NZ_RAIN) {             /* softer drops: lower and rounder (no crackle) */
+            t->p[P_E0 + 2] = drift_cut[DRIFT_PAD] = 62;  /* FREQ */
+            t->p[P_E0 + 3] = 70;                         /* RES */
+        }
+    }
+    drift_reg = d->reg;
     trk[DRIFT_PAD].p[P_DEC] = 90;
     drift_part(&trk[DRIFT_BELL], &d->part[1], 0, 127, 100);     /* struck: its own decay, a long release */
     trk[DRIFT_BELL].p[P_PAN] = 20;
@@ -226,15 +268,31 @@ static void drift_input(void)
             drift_apply();
             drift_bars |= (uint8_t)(1u << i);
         }
-    if ((s = drift_turn(EN_PRESET)) != 0)
-        drift_load((uint32_t)((int32_t)drift_world + s + (int32_t)DRIFT_NWORLDS));
+    if ((s = drift_turn(EN_PRESET)) != 0) {              /* playing: fade out, load at silence, fade in (drift_play.c) */
+        drift_world_next = (uint8_t)(((int32_t)drift_world_next + s + (int32_t)DRIFT_NWORLDS) % (int32_t)DRIFT_NWORLDS);
+        if (drift_on && drift_fade_out_ms)
+            drift_xf_req = 1;
+        else
+            drift_load(drift_world_next);
+        drift_head = 1;
+    }
+    if (drift_xf_ready) {                                /* silent now: the new world, then the fade back in */
+        drift_load(drift_world_next);
+        drift_xf_in = 1;
+        drift_xf_ready = 0;
+        drift_xf_req = 0;
+    }
     if ((s = drift_turn(EN_ALGO)) != 0) {
         drift_style = (uint8_t)(((int32_t)drift_style + s + DS_N) % DS_N);
         drift_apply();
+        drift_show = 1;
+        drift_show_ms = fm1_ms;
         drift_head = 1;
     }
     if ((s = drift_turn(EN_SELECT)) != 0) {
         drift_prog = (uint8_t)(((int32_t)drift_prog + s + (int32_t)DP_N) % (int32_t)DP_N);
+        drift_show = 2;
+        drift_show_ms = fm1_ms;
         drift_head = 1;
     }
     if ((pressed >> panel.btn[B_PLAY]) & 1u) {
@@ -492,11 +550,77 @@ static int viz_place(uint32_t p, uint32_t i, uint32_t n, int32_t lvl, int32_t *x
     return 1;
 }
 
+/* the behaviour just turned to, as a picture: a bar of sixteen steps per moving layer, lit where it plays, and the pad's
+ * breathing as a curve */
+static void drift_show_rhythm(void)
+{
+    static const char *const ROW[3] = {"ARP", "MEL", "BASS"};
+    static const uint8_t PER[6] = {0, 64, 32, 16, 8, 4};   /* the pad's LFO (PAD_BEH sync): sixteenths a cycle */
+    const drift_beh_t *b = &DRIFT_BEH[drift_style % DS_N];
+    uint32_t r, k;
+    int32_t x0 = 56, dx = 11, y;
+    cv_text(8, 2, &AF_M, DRIFT_STYLE[drift_style % DS_N], D_TEXT);
+    cv_text_r(232, 6, &AF_S, b->half ? "HALF TIME" : "", D_MID, D_BG);
+    for (r = 0; r < 3u; r++) {
+        y = 30 + (int32_t)r * 14;
+        cv_text(8, y - 6, &AF_S, ROW[r], D_MID);
+        for (k = 0; k < 16u; k++) {
+            uint32_t on = r == 0u ? k % b->arp_div == 0u
+                        : r == 2u ? (b->bass_pulse ? k % 4u == 0u : 1u)
+                        : b->mel == MM_LINE ? k % 2u == 0u
+                        : b->mel == MM_MOTIF ? k % 4u == 0u
+                        : b->mel == MM_BURST ? k == 0u || k == 2u || k == 4u
+                        : k == 0u || k == 11u;          /* MM_FLOAT: far apart */
+            if (r == 2u && !b->bass_pulse)
+                cv_rect(x0 - 2, y, dx * 16, 2, DRIFT_KCOL[2]);   /* (a held bass: one line) */
+            else
+                d_disc(x0 + (int32_t)k * dx, y + 1, on ? 3 : 1, on ? DRIFT_KCOL[r] : D_DIM, 32);
+        }
+    }
+    y = 72;
+    cv_text(8, y - 6, &AF_S, "PAD", D_MID);
+    for (k = 0; k < (uint32_t)(dx * 16); k++) {          /* the pad: still, or breathing at its pace */
+        uint32_t per = PER[PAD_BEH[drift_style % DS_N].sync % 6u], a = PAD_BEH[drift_style % DS_N].amp;
+        int32_t yy = per ? y + SINE[(k * 1024u / (per * (uint32_t)dx)) & 1023u] * (int32_t)(2u + a / 12u) / 32768 : y;
+        cv_pset(x0 - 2 + (int32_t)k, yy, D_SKY);
+    }
+}
+
+/* the progression just turned to, as a picture: its chords in turn, the one now lit, and how long each lasts */
+static void drift_show_path(void)
+{
+    const int8_t *pr = PROG[drift_prog % DP_N];
+    uint32_t i, bars = PROG_BARS[drift_prog % DP_N];
+    int32_t x = 8;
+    cv_text(8, 2, &AF_M, DRIFT_PROG[drift_prog % DP_N], D_TEXT);
+    if (drift_prog % DP_N == DP_WANDER) {
+        cv_text(8, 34, &AF_M, "ANY CHORD THAT FITS", D_SKY);
+    } else
+        for (i = 0; i < 6u && pr[i] >= 0; i++) {         /* I -> vi -> IV -> V */
+            if (i) {
+                cv_rect(x + 2, 43, 10, 2, D_DIM);
+                x += 16;
+            }
+            x = cv_text(x, 34, &AF_M, drift_roman(pr[i]), i == 0u ? D_SKY : D_TEXT) + 2;
+        }
+    cv_text(8, 64, &AF_S, !bars ? "STAYS ON ONE CHORD" : bars == 1u ? "A NEW CHORD EVERY BAR" :
+                          bars == 2u ? "A NEW CHORD EVERY 2 BARS" : "A NEW CHORD EVERY 4 BARS", D_MID);
+}
+
 static void drift_viz(void)
 {
     uint32_t p, i;
     viz_ph++;
     cv_begin(240, VIZ_H, D_BG);
+    if (drift_show && fm1_ms - drift_show_ms < 2600u) {  /* ALGORITHM or SELECT just turned: their picture a moment */
+        if (drift_show == 1u)
+            drift_show_rhythm();
+        else
+            drift_show_path();
+        cv_blit(0, VIZ_Y);
+        return;
+    }
+    drift_show = 0;
     viz_back();
     for (p = 0; p < NPART; p++)
         for (i = 0; i < NVOICE; i++) {
@@ -522,7 +646,7 @@ static void drift_draw_head(void)
     char b[16];
     uint32_t n = 0;
     const char *s;
-    const drift_world_t *w = &DRIFT_WORLDS[drift_world];
+    const drift_world_t *w = &DRIFT_WORLDS[drift_world_next];
     cv_begin(240, 24, D_BG);                             /* the three choices */
     cv_text(8, 4, &AF_S, w->name, D_TEXT);
     cv_text(120 - text_w(&AF_S, DRIFT_PROG[drift_prog % DP_N]) / 2, 4, &AF_S, DRIFT_PROG[drift_prog % DP_N], D_TEXT);

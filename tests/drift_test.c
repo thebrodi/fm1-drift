@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
 /* DRIFT's checks: the browser build (web/emu/felucca_web.c) compiled natively and played by a restless player.
+ *   0. PLAY's fades and a world change's dip: rising, falling, no click, silent at the end
  *   1. every world x behaviour with every layer on: no clipping, no clicks, no DC, never silent, levels in a band
  *   2. every punch-in in every world: no clipping, no click, no level jump
  *   3. half an hour (simulated) of random playing: PLAY, layers, black-key chords (tapped and held), the seven knobs,
@@ -204,12 +205,63 @@ static void restless(uint32_t minutes)
     CHECK(stuck == 0, "random playing: stuck notes after %u of %u stops", stuck, stops);
 }
 
+/* 0: PLAY's fades and a world change's dip, with their real lengths: smooth, no click, silent at the end */
+static void fades(void)
+{
+    double r[12];
+    uint32_t i, ok = 1;
+    printf("-- fades: PLAY in (8 s), a world change (1.5 s out, 2.5 s in), PLAY out (8 s)\n");
+    drift_load(0);
+    drift_layers = (1u << DL_N) - 1u;
+    button(B_PLAY);
+    for (i = 0; i < 10u; i++) {                          /* the fade in, second by second: rising */
+        reset();
+        run(1000);
+        r[i] = db(rms());
+        CHECK(jump < 0.25, "fade in: a click (%.3f) in second %u", jump, i + 1);
+    }
+    printf("  in:  ");
+    for (i = 0; i < 10u; i++) printf(" %.0f", r[i]);
+    printf(" dBFS\n");
+    CHECK(r[0] < r[8] - 8.0, "fade in: the first second (%.1f) not well below the ninth (%.1f)", r[0], r[8]);
+    web_enc(EN_PRESET, 1);                               /* a world change, playing */
+    for (i = 0; i < 6u; i++) {
+        reset();
+        run(1000);
+        r[i] = db(rms());
+        CHECK(jump < 0.25, "world change: a click (%.3f) in second %u", jump, i + 1);
+    }
+    printf("  world change:");
+    for (i = 0; i < 6u; i++) printf(" %.0f", r[i]);
+    printf(" dBFS (now %s)\n", DRIFT_WORLDS[drift_world].name);
+    CHECK(drift_world == 1u, "world change: still %s", DRIFT_WORLDS[drift_world].name);
+    CHECK(r[1] < r[5] - 10.0, "world change: no dip (%.1f vs %.1f)", r[1], r[5]);
+    button(B_PLAY);                                      /* PLAY again: out over 8 s, then silence */
+    for (i = 0; i < 10u; i++) {
+        reset();
+        run(1000);
+        r[i] = db(rms());
+        CHECK(jump < 0.25, "fade out: a click (%.3f) in second %u", jump, i + 1);
+        ok &= i == 0u || r[i] <= r[i - 1] + 3.0;
+    }
+    printf("  out: ");
+    for (i = 0; i < 10u; i++) printf(" %.0f", r[i]);
+    printf(" dBFS\n");
+    CHECK(ok, "fade out: it rose on the way down");
+    CHECK(!drift_on && r[9] < -80.0, "fade out: not silent and stopped after 10 s (%.1f dBFS)", r[9]);
+    drift_fade_in_ms = drift_fade_out_ms = 0;            /* (the rest: at once, as before the fades) */
+    drift_gain = DG_ONE;
+    drift_fade_to(DG_ONE, 0);
+}
+
 int main(int argc, char **argv)
 {
     uint32_t minutes = argc > 1 ? (uint32_t)atoi(argv[1]) : 30u;
     web_nor_erase();
     web_boot();
     run(1000);
+    drift_input();
+    fades();
     matrix();
     punches();
     restless(minutes);

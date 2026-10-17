@@ -30,16 +30,16 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 
 | Control | Does |
 |---|---|
-| **PLAY** | Starts / stops the music |
+| **PLAY** | Starts the music with an 8 s fade in; pressed again, an 8 s fade out, then it stops |
 | **KNOB 1 — Space** | Reverb: dry and close → a vast hall |
 | **KNOB 2 — Echo** | Delay: none → long repeating trails |
 | **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness, the analog pads' filter; the bells half as much) |
 | **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play: ×0.2 … ×2.2; chorus and drift) |
 | **White keys** | Toggle the 7 layers, lit while on (the pattern repeats across the keyboard) |
 | **Black keys** | Chords to jump to: press = go there, hold = stay, let go = the progression carries on |
-| **PRESETS** knob | The world: the sounds, the key and the tempo (a few, each complete) |
-| **ALGORITHM** knob | The behaviour: how every layer plays (DRIFT, RIPPLE, SWELL, CHIME, PULSE) |
-| **SELECT** knob | The progression: which chords the music walks through |
+| **PRESETS** knob | The world: the sounds, the key and the tempo. Playing, a change dips out (1.5 s) and back in (2.5 s): no cut |
+| **ALGORITHM** knob | The behaviour: how every layer plays (DRIFT, RIPPLE, SWELL, CHIME, PULSE); its rhythm shown a moment |
+| **SELECT** knob | The progression: which chords the music walks through; its chord path shown a moment |
 | **OCT− / OCT+** | Everything an octave down / up |
 | **FX SCL ENV LFO EDIT GLO** | Punch-in effects on the whole sound while held (below) |
 | Other buttons | Unused |
@@ -137,6 +137,11 @@ into a part as its own patch; Felucca's factory sounds stay as they are.
 | BOWLS | C minor | 56 | warm drone | singing bowl (rings ~20 s) | overtone drone | DRIFT, DRONE |
 | GARDEN | A major | 64 | granular shimmer | kalimba | bright, open "ah" | CHIME, FLOAT |
 | FOREST | E minor | 58 | FM air pad (breathy) | soft flute | breathy "hoo", like wind | DRIFT, WANDER |
+| OCEAN | D major | 54 | brown-noise waves (swelling over two bars) | clear glass bell, low | low "ooh" | DRIFT, FLOAT |
+| RAIN | E minor | 62 | soft rain drops (noise) | kalimba | hum | RIPPLE, LONGING |
+| CAVE | A minor | 50 | dark FM pad, the whole world 5 semitones lower | clear glass bell | deep choir, "aah" to "ooh" | SWELL, DRONE |
+| HANDPAN | D minor | 66 | warm drone | handpan | warm "ooh" | PULSE, FLOAT |
+| CRYSTAL | C major | 52 | FM air pad | crystal singing bowl | airy, high "aah" | DRIFT, HOME |
 
 Each world also has its own room: reverb type and damping, delay time and colour. NEON has a square
 bass; the others a sub bass. The VOX is the voice engine with the world's own vowel, its glide to a
@@ -153,13 +158,14 @@ solid discs on deep navy; nothing glows.
 | Top | The three choices: world (PRESETS), progression (SELECT), behaviour (ALGORITHM), over a thin line |
 | Below | The chord now (`vi`, `V add9  HELD`), or PRESS PLAY |
 | Layers | The seven layers, underlined while on |
-| Middle | The world's quiet picture, the sounding notes in it as solid discs that dim as they fade; a punch-in's name on a pill while it plays |
+| Middle | The world's quiet picture, the sounding notes in it as solid discs that dim as they fade; a punch-in's name on a pill while it plays. For 2.5 s after ALGORITHM turns: its rhythm (sixteen steps for ARP, MEL and BASS, lit where they play; HALF TIME; the pad's breathing as a curve). After SELECT turns: its chord path (I – vi – IV – V) and how long each chord lasts |
 | Knobs | SPACE, ECHO, GLOW, MOTION: a rounded bar in each knob's colour, and the value |
 | Bottom | Key, mode and tempo; the octave when shifted |
 
 The worlds' pictures: GLASS an orbit, EMBER a low warm line with rising embers, DUSK a slow horizon
 wave, NIGHT stars, NEON an 80s grid, LOFI slow rain, BOWLS rings opening with each bowl, GARDEN
-fireflies, FOREST bands of mist with lights drifting down.
+fireflies, FOREST bands of mist with lights drifting down; the five newer worlds (OCEAN … CRYSTAL) float on
+a slow wave.
 
 At power-on a splash shows a planet with two moons, DRIFT and the version. Colours: deep navy, with
 pastel sky, lilac, rose, mint and peach.

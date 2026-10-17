@@ -73,7 +73,11 @@ static const drift_beh_t DRIFT_BEH[DS_N] = {
 };
 
 /* --------------------------------------------- shared with the UI ---- */
-static volatile uint8_t drift_run;       /* PLAY */
+static volatile uint8_t drift_run;       /* PLAY: the music asked for (the UI; a stop fades out first: drift_on) */
+static volatile uint8_t drift_on;        /* the music is going: notes come (from PLAY until its fade out has ended) */
+static volatile uint32_t drift_fade_in_ms = 8000u, drift_fade_out_ms = 8000u;   /* PLAY's fades (the tests: 0, none) */
+static volatile uint8_t drift_xf_req;    /* the UI: a world change, fade out (the ISR sets drift_xf_ready at silence) */
+static volatile uint8_t drift_xf_ready;  /* .. silent: the UI loads the new world, clears both, and it fades in */
 static volatile uint8_t drift_style;     /* ALGORITHM: DS_* */
 static volatile uint8_t drift_prog = 1;  /* SELECT: the progression */
 static volatile uint8_t drift_motion = 50;   /* KNOB 4: 0..127 */
@@ -81,6 +85,8 @@ static volatile int8_t drift_oct;        /* OCT- / OCT+: -1 .. +1 */
 static volatile uint8_t drift_root = 2;  /* the world's key (D) */
 static volatile uint8_t drift_minor;     /* the world's mode: 0 major, 1 natural minor */
 static volatile int8_t drift_vox_reg;    /* the world's VOX register: semitones from the middle (-12, 0, +12) */
+static volatile int8_t drift_reg;        /* the world's register: semitones the whole music sits lower (CAVE) or higher */
+static volatile uint8_t drift_pad_noise; /* the world's pad is noise (OCEAN, RAIN): one voice, no shimmer, no chord */
 static volatile uint8_t drift_bpm = 72;  /* the world's tempo */
 static volatile uint8_t drift_resync;    /* the UI reloaded the parts' sounds: start the held notes again */
 static volatile uint8_t drift_layers = 1u << DL_PAD | 1u << DL_MELODY;   /* the layers on (bit DL_*) */
@@ -211,7 +217,7 @@ static volatile uint32_t drift_since;    /* the sixteenth the chord began on (th
 static int32_t drift_clock;              /* samples to the next sixteenth */
 
 /* the register's low edge: middle, moved by OCT (and a little higher for an add9 chord) */
-static int32_t drift_lo(void) { return 55 + 12 * drift_oct + (drift_bright ? 3 : 0); }
+static int32_t drift_lo(void) { return 55 + 12 * drift_oct + drift_reg + (drift_bright ? 3 : 0); }
 
 /* the chord's tones as scale steps above its degree: a triad, or its add9 (3rd 5th 9th; the bass has the root) */
 static uint32_t drift_tones(int32_t *st)
@@ -260,7 +266,9 @@ static void drift_voice_held(void)
     int32_t st[3], lo = drift_lo();
     uint32_t n = 0, i, j, x;
     drift_tones(st);
-    if (drift_run && (drift_layers >> DL_PAD) & 1u) {
+    if (drift_on && drift_pad_noise && ((drift_layers >> DL_PAD) & 1u || (drift_layers >> DL_SHIMMER) & 1u))
+        want[n++] = (uint8_t)drift_note(0, lo);          /* noise: one voice, its pitch no matter (the engine's TRK 0) */
+    else if (drift_on && (drift_layers >> DL_PAD) & 1u) {
         for (i = 0; i < 3u; i++)
             want[n++] = (uint8_t)drift_note(st[i], lo - 3);
         for (i = 1; i < n; i++)                          /* ascending (the shimmer goes above the top) */
@@ -270,7 +278,7 @@ static void drift_voice_held(void)
                 want[j - 1] = (uint8_t)x;
             }
     }
-    if (drift_run && (drift_layers >> DL_SHIMMER) & 1u) {
+    if (drift_on && !drift_pad_noise && (drift_layers >> DL_SHIMMER) & 1u) {
         want[n] = n ? (uint8_t)(want[n - 1u] + 12u) : (uint8_t)drift_note(4, lo + 12);
         while (want[n] > 84u)                            /* (C6: higher, a bright pad turns thin and fizzy) */
             want[n] = (uint8_t)(want[n] - 12u);
@@ -280,13 +288,13 @@ static void drift_voice_held(void)
         drift_act[DL_PAD] = drift_act[DL_SHIMMER] = 255;
     drift_hold_set(&drift_pad, want, n, 80);
     n = 0;
-    if (drift_run && (drift_layers >> DL_BASS) & 1u)
+    if (drift_on && (drift_layers >> DL_BASS) & 1u)
         want[n++] = (uint8_t)drift_above(drift_note(0, lo - 22), 28u);   /* (E1, 41 Hz: lower, a small speaker loses it) */
     if (n)
         drift_act[DL_BASS] = 255;
     drift_hold_set(&drift_bass, want, n, 90);
     n = 0;
-    if (drift_run && (drift_layers >> DL_CHOIR) & 1u) {
+    if (drift_on && (drift_layers >> DL_CHOIR) & 1u) {
         uint32_t v = drift_above(drift_note(st[drift_choir_tone % 3u], lo + drift_vox_reg), 40u);   /* (E2 ..) */
         while (v > 72u)                                  /* (.. C5: higher, the voice turns shrill) */
             v -= 12u;
@@ -369,11 +377,39 @@ static void drift_keys_block(void)
         if (!key_black(k)) {                             /* a layer on / off */
             drift_layers ^= (uint8_t)(1u << (p % DL_N));
             drift_voice_held();
-        } else if (drift_run) {                          /* a chord: there now, and held while the key is */
+        } else if (drift_on) {                          /* a chord: there now, and held while the key is */
             drift_pin = (uint8_t)p;
             drift_jump(DRIFT_BLACK[drift_minor & 1u][p % 5u], p >= 5u);
         }
         drift_seen++;
+    }
+}
+
+/* the whole sound's level (Q24): PLAY fades it in and out, a world change dips it; applied to the mix (audio.c
+ * audio_block, before USB and the DAC) */
+#define DG_ONE (1 << 24)
+static int32_t drift_gain = DG_ONE, drift_gain_to = DG_ONE, drift_gain_step = DG_ONE;
+static uint8_t drift_xf_in;              /* the fade in after a world change (2.5 s, not PLAY's) */
+static void drift_fade_to(int32_t to, uint32_t ms)
+{
+    drift_gain_to = to;
+    drift_gain_step = ms ? (int32_t)(167772160u / (ms * 441u)) + 1 : DG_ONE;   /* (1 << 24) * 10 / (ms * 441) */
+}
+static void drift_gain_block(int32_t *out, uint32_t n)
+{
+    uint32_t i;
+    if (drift_gain == DG_ONE && drift_gain_to == DG_ONE)
+        return;
+    for (i = 0; i < n; i++) {
+        if (drift_gain < drift_gain_to)
+            drift_gain = drift_gain + drift_gain_step < drift_gain_to ? drift_gain + drift_gain_step : drift_gain_to;
+        else if (drift_gain > drift_gain_to)
+            drift_gain = drift_gain - drift_gain_step > drift_gain_to ? drift_gain - drift_gain_step : drift_gain_to;
+        {   /* (a gentle feel: the square of the linear ramp) */
+            int64_t g = (int64_t)drift_gain * drift_gain >> 24;
+            out[2u * i] = (int32_t)((int64_t)out[2u * i] * g >> 24);
+            out[2u * i + 1u] = (int32_t)((int64_t)out[2u * i + 1u] * g >> 24);
+        }
     }
 }
 
@@ -402,7 +438,7 @@ static void drift_prog_start(void)
     drift_bright = 0;
     drift_since = drift_tick;
     drift_motif_ok = 0;
-    drift_deg = drift_run ? drift_cur : -1;
+    drift_deg = drift_on ? drift_cur : -1;
     drift_seen++;
 }
 
@@ -540,8 +576,30 @@ static void drift_player(uint32_t n)
         drift_prog_start();                              /* a new world: its progression from the start */
         drift_voice_held();
     }
-    if (drift_was_run != drift_run) {                    /* started (the progression from its first chord) or stopped */
-        drift_was_run = drift_run;
+    if (drift_run && !drift_on) {                        /* PLAY: on, fading in from silence */
+        drift_on = 1;
+        drift_gain = drift_fade_in_ms ? 0 : DG_ONE;
+        drift_fade_to(DG_ONE, drift_fade_in_ms);
+    } else if (!drift_run && drift_on) {                 /* PLAY again: a fade out, then the stop */
+        if (!drift_fade_out_ms)
+            drift_on = 0;                                /* (the tests: at once, the tails ringing) */
+        else if (drift_gain_to)
+            drift_fade_to(0, drift_fade_out_ms);
+        else if (!drift_gain) {
+            drift_on = 0;                                /* (silent: the tails go unheard; the next PLAY fades in) */
+            drift_xf_req = 0;
+        }
+    } else if (drift_on && drift_xf_req) {               /* a world change: out quickly; at silence the UI loads it */
+        if (drift_gain_to)
+            drift_fade_to(0, 1500u);
+        else if (!drift_gain)
+            drift_xf_ready = 1;
+    } else if (drift_on && drift_gain_to != DG_ONE)      /* back in: a new world, or PLAY pressed during a fade out */
+        drift_fade_to(DG_ONE, drift_xf_in ? 2500u : drift_fade_in_ms);
+    if (drift_gain_to == DG_ONE && drift_gain == DG_ONE)
+        drift_xf_in = 0;
+    if (drift_was_run != drift_on) {                     /* started (the progression from its first chord) or stopped */
+        drift_was_run = drift_on;
         drift_tick = 0;
         drift_clock = 0;
         drift_pin = 0xFF;
@@ -551,7 +609,7 @@ static void drift_player(uint32_t n)
         drift_prog_start();
         drift_voice_held();                              /* (stopped: everything held lets go, the tails ring) */
     }
-    if (!drift_run)
+    if (!drift_on)
         return;
     drift_clock -= (int32_t)n;
     while (drift_clock <= 0) {
@@ -578,7 +636,7 @@ static void drift_block(uint32_t n)
                 down |= 1u << i;
         drift_punch_tap |= (uint8_t)(down & ~drift_punch_want);
         drift_punch_want = (uint8_t)down;
-        if (!drift_run)
+        if (!drift_on)
             drift_punch_sync(drift_punch_want);
     }
     if (oct != drift_oct) {                              /* the register moved: the held notes */
