@@ -61,17 +61,19 @@ share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (pa
 
 ### Punch-in effects (FX SCL ENV LFO EDIT GLO)
 
-Hold a button and its effect plays on the whole sound, in time; let go and it returns, like a DJ in a
-live set (after the Pocket Operator KO-33). The button lights while held and the effect's name glows
-in the middle of the screen. They are Felucca's own performance effects (`perform.c`) on the master.
+Hold a button and its effect plays on the whole sound; let go and it returns, like a DJ in a live
+set (after the Pocket Operator KO-33). While the music plays they snap to the beat: a press starts
+the effect on the next beat, a release ends it at the end of the beat it is in, and a quick tap plays
+one beat. Stopped, they act at once. The button lights while held and the effect's name shows in the
+middle of the screen. They are Felucca's own performance effects (`perform.c`) on the master.
 
 | Button | Effect |
 |---|---|
-| FX | TAPE STOP: the whole sound warps down |
+| FX | ECHOES: everything thrown into the delay, the repeats lifted |
 | SCL | STUTTER: the last sixteenth repeats |
 | ENV | FREEZE: the moment holds |
 | LFO | SHIMMER: an octave above, beside itself |
-| EDIT | UNDERWATER: a low-pass sweeping down over a bar |
+| EDIT | UNDERWATER: a low-pass sweeping down over a bar to a clear muffle (not to the bottom) |
 | GLO | WASH: everything thrown into the reverb |
 
 ### Chords (black keys)
@@ -143,20 +145,24 @@ within a few dB of each other in every world.
 
 ## Screen
 
-One page, nothing to navigate, in one style: soft light. Everything is text and glowing light on deep
-navy: no solid bars, boxes or hard lines.
+One page, nothing to navigate, in one style: solid. Crisp text, thin lines and dots, rounded bars and
+solid discs on deep navy; nothing glows.
 
 | Where | Shows |
 |---|---|
-| Top | The three choices: world (PRESETS), progression (SELECT), behaviour (ALGORITHM), over a faint glow |
+| Top | The three choices: world (PRESETS), progression (SELECT), behaviour (ALGORITHM), over a thin line |
 | Below | The chord now (`vi`, `V add9  HELD`), or PRESS PLAY |
-| Layers | The seven layers, a soft light under each one that is on |
-| Middle | The world's quiet picture, the sounding notes as soft lights; a punch-in's name while held |
-| Knobs | SPACE, ECHO, GLOW, MOTION: a glowing bar with a light at its end, and the value |
+| Layers | The seven layers, underlined while on |
+| Middle | The world's quiet picture, the sounding notes in it as solid discs that dim as they fade; a punch-in's name on a pill while it plays |
+| Knobs | SPACE, ECHO, GLOW, MOTION: a rounded bar in each knob's colour, and the value |
 | Bottom | Key, mode and tempo; the octave when shifted |
 
-At power-on a splash shows a soft planet, DRIFT and the version. Colours: deep navy, with pastel
-sky, lilac, rose, mint and peach.
+The worlds' pictures: GLASS an orbit, EMBER a low warm line with rising embers, DUSK a slow horizon
+wave, NIGHT stars, NEON an 80s grid, LOFI slow rain, BOWLS rings opening with each bowl, GARDEN
+fireflies, FOREST bands of mist with lights drifting down.
+
+At power-on a splash shows a planet with two moons, DRIFT and the version. Colours: deep navy, with
+pastel sky, lilac, rose, mint and peach.
 
 ## Sound
 
