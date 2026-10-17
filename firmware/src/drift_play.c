@@ -366,6 +366,12 @@ static void drift_player(uint32_t n)
         drift_resync = 0;
         drift_pad.n = drift_bass.n = drift_choir.n = 0;
         memset(drift_bn, 0, sizeof drift_bn);
+        drift_pos = 0;                                   /* a new world: its progression from the start */
+        drift_cur = PROG[drift_prog % DP_N][0];
+        drift_bright = 0;
+        drift_since = drift_tick;
+        drift_deg = drift_run ? drift_cur : -1;
+        drift_seen++;
         drift_voice_held();
     }
     if (drift_was_run != drift_run) {                    /* started (the progression from its first chord) or stopped */

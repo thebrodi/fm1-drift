@@ -19,32 +19,45 @@
 #define ENGI_ANALOG 0u                   /* engines.c ENGINES[] */
 #define ENGI_FORMANT 5u
 #define ENGI_WHEEL 7u
-enum { FM6_TINE = 0, FM6_BELL = 1, FM6_PAD = 4, FM6_MARIMBA = 5 };          /* eng_fm6.c FM6_PRESETS */
-enum { AN_SOFT_PAD = 1, AN_PWM_STR = 3, AN_SUB_BASS = 7 };                    /* eng_analog.c's presets */
+#define ENGI_GRAIN 8u
+enum { FM6_TINE = 0, FM6_BELL = 1, FM6_PAD = 4, FM6_MARIMBA = 5 };   /* eng_fm6.c FM6_PRESETS */
+enum { AN_SOFT_PAD = 1, AN_SQR_BASS = 2, AN_PWM_STR = 3, AN_SUB_BASS = 7, AN_STRINGS = 11 };   /* eng_analog.c's */
 enum { FO_CHOIR = 0, FO_WHISPER = 3 };                                        /* eng_formant.c's */
 enum { WH_SOFT_FLUTE = 3 };                                                   /* eng_wheel.c's */
+enum { GR_CLOUD = 0, GR_FROZEN = 2, GR_SHIMMER = 3 };                         /* eng_grain.c's */
+enum { RV_ROOM, RV_SPRING, RV_HALL };                                         /* G_RTYPE */
+enum { DT_4 = 0, DT_8 = 1, DT_8T = 4, DT_2 = 6, DT_1 = 7, DT_8D = 10, DT_4D = 12 };   /* G_DTIME (params.c N_DTIME) */
 #define NO_PATCH 0xFFu
 typedef struct { uint8_t engine, preset, patch, level; } drift_sound_t;
 typedef struct {
     const char *name;
     uint8_t root, minor, bpm;            /* the key (0 = C) and its mode, the tempo */
-    drift_sound_t part[NPART];           /* pad, bells, bass, choir */
+    drift_sound_t part[NPART];           /* pad, bells, bass, voice */
+    uint8_t rtype, rdamp, dtime, dcolor; /* the room: reverb type and damping; the echo: its time and colour */
+    uint8_t style, prog;                 /* the behaviour and progression it starts with (ALGORITHM, SELECT) */
 } drift_world_t;
 #define SUB {ENGI_ANALOG, AN_SUB_BASS, NO_PATCH, 88}
 #define AAH {ENGI_FORMANT, FO_CHOIR, NO_PATCH, 86}
 #define BREATH {ENGI_FORMANT, FO_WHISPER, NO_PATCH, 100}
 static const drift_world_t DRIFT_WORLDS[] = {
-    {"GLASS", 2, 0, 72, {{ENGI_FM6, FM6_PAD, NO_PATCH, 102}, {ENGI_FM6, FM6_BELL, NO_PATCH, 112}, SUB, AAH}},
-    {"EMBER", 9, 0, 66, {{ENGI_FM6, FM6_PAD, NO_PATCH, 102}, {ENGI_FM6, FM6_TINE, NO_PATCH, 108}, SUB, AAH}},
-    {"DUSK", 5, 0, 80, {{ENGI_FM6, FM6_PAD, NO_PATCH, 102}, {ENGI_FM6, FM6_MARIMBA, NO_PATCH, 127}, SUB, AAH}},
-    {"NIGHT", 4, 1, 60, {{ENGI_FM6, FM6_PAD, DF_DARK_PAD, 102}, {ENGI_FM6, FM6_BELL, NO_PATCH, 112}, SUB, BREATH}},
-    {"NEON", 7, 0, 84, {{ENGI_ANALOG, AN_PWM_STR, NO_PATCH, 87}, {ENGI_FM6, FM6_BELL, DF_CRYSTAL, 108}, SUB, AAH}},
-    {"LOFI", 3, 0, 70, {{ENGI_ANALOG, AN_SOFT_PAD, NO_PATCH, 87}, {ENGI_FM6, FM6_TINE, DF_SOFT_KEYS, 110}, SUB,
-                         BREATH}},
-    {"BOWLS", 0, 1, 56, {{ENGI_FM6, FM6_PAD, DF_DRONE, 100}, {ENGI_FM6, FM6_BELL, DF_BOWL, 98}, SUB, AAH}},
-    {"GARDEN", 9, 0, 64, {{ENGI_FM6, FM6_PAD, DF_DRONE, 100}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 112}, SUB, AAH}},
-    {"FOREST", 4, 1, 58, {{ENGI_FM6, FM6_PAD, NO_PATCH, 100}, {ENGI_WHEEL, WH_SOFT_FLUTE, NO_PATCH, 122}, SUB,
-                          BREATH}},
+    {"GLASS", 2, 0, 72, {{ENGI_FM6, FM6_PAD, NO_PATCH, 102}, {ENGI_FM6, FM6_BELL, NO_PATCH, 112}, SUB, AAH},
+     RV_HALL, 60, DT_4, 64, DS_DRIFT, 1},
+    {"EMBER", 9, 0, 66, {{ENGI_ANALOG, AN_STRINGS, NO_PATCH, 88}, {ENGI_FM6, FM6_TINE, NO_PATCH, 108}, SUB, AAH},
+     RV_SPRING, 80, DT_8T, 40, DS_RIPPLE, 2},
+    {"DUSK", 5, 0, 80, {{ENGI_GRAIN, GR_CLOUD, NO_PATCH, 96}, {ENGI_FM6, FM6_MARIMBA, NO_PATCH, 127}, SUB, BREATH},
+     RV_ROOM, 70, DT_8D, 50, DS_PULSE, 4},
+    {"NIGHT", 4, 1, 60, {{ENGI_FM6, FM6_PAD, DF_DARK_PAD, 102}, {ENGI_FM6, FM6_BELL, NO_PATCH, 112}, SUB, BREATH},
+     RV_HALL, 88, DT_2, 30, DS_SWELL, 3},
+    {"NEON", 7, 0, 84, {{ENGI_ANALOG, AN_PWM_STR, NO_PATCH, 87}, {ENGI_FM6, FM6_BELL, DF_CRYSTAL, 108},
+                        {ENGI_ANALOG, AN_SQR_BASS, NO_PATCH, 96}, AAH}, RV_HALL, 50, DT_8D, 72, DS_PULSE, 1},
+    {"LOFI", 3, 0, 70, {{ENGI_ANALOG, AN_SOFT_PAD, NO_PATCH, 91}, {ENGI_FM6, FM6_TINE, DF_SOFT_KEYS, 110}, SUB,
+                        BREATH}, RV_ROOM, 90, DT_8, 24, DS_RIPPLE, 3},
+    {"BOWLS", 0, 1, 56, {{ENGI_FM6, FM6_PAD, DF_DRONE, 100}, {ENGI_FM6, FM6_BELL, DF_BOWL, 98}, SUB, AAH},
+     RV_HALL, 66, DT_1, 40, DS_DRIFT, 0},
+    {"GARDEN", 9, 0, 64, {{ENGI_GRAIN, GR_SHIMMER, NO_PATCH, 106}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 112}, SUB,
+                          AAH}, RV_SPRING, 60, DT_8T, 60, DS_CHIME, 2},
+    {"FOREST", 4, 1, 58, {{ENGI_GRAIN, GR_FROZEN, NO_PATCH, 96}, {ENGI_WHEEL, WH_SOFT_FLUTE, NO_PATCH, 122}, SUB,
+                          BREATH}, RV_HALL, 76, DT_4D, 44, DS_DRIFT, 5},
 };
 #define DRIFT_NWORLDS (sizeof DRIFT_WORLDS / sizeof DRIFT_WORLDS[0])
 
@@ -132,10 +145,12 @@ static void drift_load(uint32_t w)
     drift_minor = d->minor;
     drift_bpm = d->bpm;
     song.g[G_BPM] = d->bpm;                              /* (the delay's 1/4 follows it) */
-    song.g[G_RTYPE] = 2;                                 /* HALL */
-    song.g[G_RDAMP] = 72;
-    song.g[G_DTIME] = 0;
-    song.g[G_DCOLOR] = 44;                               /* darker repeats */
+    song.g[G_RTYPE] = d->rtype;
+    song.g[G_RDAMP] = d->rdamp;
+    song.g[G_DTIME] = d->dtime;
+    song.g[G_DCOLOR] = d->dcolor;
+    drift_style = d->style;                              /* where the world starts; ALGORITHM and SELECT turn from there */
+    drift_prog = d->prog;
     song.g[G_DMIX] = 90;
     drift_apply();
     drift_resync = 1;                                    /* (the ISR starts the held notes on the new sounds) */
@@ -246,6 +261,7 @@ static void drift_leds(void)
 #define D_MINT RGB(159, 225, 203)
 #define D_PEACH RGB(245, 196, 179)
 #define D_VIOLET RGB(127, 119, 221)
+#define D_GRID RGB(82, 72, 140)
 #define VIZ_Y 84u
 #define VIZ_H 88u
 
@@ -286,25 +302,138 @@ static void d_glow(int32_t cx, int32_t cy, int32_t r, uint16_t c, uint32_t a)
         }
 }
 
-/* the sounding voices as soft lights: across by pitch, the height a slow wave, the size their level */
+/* ---- the lights: the sounding voices as soft lights, each world with its own quiet picture behind them and its own
+ * way of moving them (one sentence each in DRIFT.md). Lights across by pitch, their size and brightness their level.
+ * Only thin dots and lines and soft lights: nothing busy ---- */
+static uint32_t viz_ph;                  /* one step a drawn frame (~30 a second) */
+static int32_t v_sin(uint32_t a, int32_t amp) { return SINE[a & 1023u] * amp / 32768; }
+
+static void viz_ring(int32_t cx, int32_t cy, int32_t rx, int32_t ry, uint16_t c, uint32_t a)   /* a dotted ellipse */
+{
+    uint32_t k, n = rx < 8 ? 16u : 48u;
+    for (k = 0; k < n; k++)
+        d_add(cx + v_sin(k * 1024u / n + 256u, rx), cy + v_sin(k * 1024u / n, ry), c, a);
+}
+
+/* the picture behind the lights */
+static void viz_back(void)
+{
+    int32_t x, y, w = 240, h = (int32_t)VIZ_H, m = h / 2;
+    uint32_t i, r = 0x9E3779B9u;
+    switch (drift_world) {
+    case 0:                                              /* GLASS: a thin orbit */
+        viz_ring(w / 2, m, 100, 34, D_LILAC, 14);
+        break;
+    case 1:                                              /* EMBER: a warm glow low down */
+        d_glow(w / 2 + v_sin(viz_ph * 2u, 30), h + 6, 46, D_PEACH, 4);
+        break;
+    case 3:                                              /* NIGHT: still stars, a few twinkling */
+        for (i = 0; i < 34u; i++) {
+            r = r * 1664525u + 1013904223u;
+            d_add((int32_t)(r >> 8) % w, (int32_t)(r >> 20) % h, D_TEXT, 3u + ((r >> 3) + viz_ph / 6u) % 5u);
+        }
+        break;
+    case 4:                                              /* NEON: a horizon and a grid running toward it */
+        cv_rect(0, m + 6, w, 1, D_ROSE);
+        for (x = -6; x <= 6; x++)
+            cv_line(w / 2 + x * 8, m + 6, w / 2 + x * 44, h, D_GRID);
+        for (i = 0; i < 4u; i++) {
+            y = m + 6 + (int32_t)(((viz_ph / 2u + i * 16u) % 64u) * ((viz_ph / 2u + i * 16u) % 64u) / 120u);
+            if (y < h)
+                cv_rect(0, y, w, 1, D_GRID);
+        }
+        break;
+    case 5:                                              /* LOFI: slow soft rain */
+        for (i = 0; i < 22u; i++) {
+            r = r * 1664525u + 1013904223u;
+            x = (int32_t)(r >> 8) % w;
+            y = (int32_t)(((r >> 20) + viz_ph * (2u + (r >> 30))) % (uint32_t)(h + 10)) - 10;
+            cv_line(x, y, x - 1, y + 6, D_DIM);
+        }
+        break;
+    case 6:                                              /* BOWLS: still rings around the centre */
+        for (i = 1; i <= 3u; i++)
+            viz_ring(w / 2, m, (int32_t)i * 26, (int32_t)i * 13, D_LILAC, 10);
+        break;
+    case 8:                                              /* FOREST: slow mist in bands */
+        for (i = 0; i < 3u; i++)
+            for (x = 0; x < w; x += 2)
+                d_add(x, m - 18 + (int32_t)i * 18 + v_sin((uint32_t)x * 4u + viz_ph + i * 300u, 4), D_MINT, 3);
+        break;
+    case 2:                                              /* DUSK: the horizon, a slow wave */
+    default:                                             /* GARDEN: nothing but the fireflies */
+        if (drift_world == 2u)
+            for (x = 0; x < w; x += 3)
+                cv_pset(x, m + v_sin((uint32_t)x * 6u + viz_ph * 2u, 6), D_DIM);
+        break;
+    }
+}
+
+/* where voice i of part p (note n) shines, and how big; 0 = not drawn as a light (BOWLS' bells are rings) */
+static int viz_place(uint32_t p, uint32_t i, uint32_t n, int32_t lvl, int32_t *x, int32_t *y, int32_t *rad)
+{
+    int32_t w = 240, h = (int32_t)VIZ_H, m = h / 2, px = ((int32_t)n - 28) * w / 76;
+    uint32_t a = n * 97u + viz_ph * (3u + p);
+    *rad = 5 + lvl / 3 + (p == DRIFT_PAD ? 4 : 0);
+    switch (drift_world) {
+    case 0:                                              /* GLASS: around the orbit */
+        a = n * 53u + viz_ph * (2u + p);
+        *x = w / 2 + v_sin(a + 256u, 100);
+        *y = m + v_sin(a, 34);
+        break;
+    case 1:                                              /* EMBER: rising and fading */
+        *x = px + v_sin(viz_ph * 3u + n * 41u, 6);
+        *y = h - 6 - (int32_t)((viz_ph / 2u + n * 37u + i * 11u) % (uint32_t)(h + 10));
+        break;
+    case 3:                                              /* NIGHT: small and high, like stars */
+        *x = px;
+        *y = 10 + (int32_t)((n * 29u) % (uint32_t)(m + 10));
+        *rad = 3 + lvl / 5;
+        break;
+    case 4:                                              /* NEON: sitting on the horizon */
+        *x = px;
+        *y = m + 4 - lvl / 4;
+        break;
+    case 6:                                              /* BOWLS: a bell is a ring opening out; the rest float */
+        if (p == DRIFT_BELL) {
+            int32_t rx = 6 + (32 - lvl) * 3;
+            viz_ring(w / 2 + (px - w / 2) / 4, m, rx, rx / 2, DRIFT_PCOL[p], 10u + (uint32_t)lvl / 2u);
+            return 0;
+        }
+        *x = px;
+        *y = m + v_sin(a, 16);
+        break;
+    case 7:                                              /* GARDEN: fireflies wandering */
+        *x = px + v_sin(viz_ph * (5u + i) + n * 71u, 22);
+        *y = m + v_sin(viz_ph * (4u + p) + n * 113u + 256u, 30);
+        *rad = 3 + lvl / 4;
+        break;
+    case 8:                                              /* FOREST: drifting slowly down through the mist */
+        *x = px + v_sin(viz_ph * 2u + n * 61u, 14);
+        *y = (int32_t)((viz_ph / 3u + n * 23u + i * 17u) % (uint32_t)(h + 10)) - 5;
+        break;
+    default:                                             /* DUSK, LOFI: floating on a slow wave */
+        *x = px;
+        *y = m + v_sin(a, 28);
+        break;
+    }
+    return 1;
+}
+
 static void drift_viz(void)
 {
-    static uint32_t ph;
     uint32_t p, i;
-    int32_t x;
-    ph++;
+    viz_ph++;
     cv_begin(240, VIZ_H, D_BG);
-    for (x = 0; x < 240; x += 3)                         /* the horizon: a slow, faint wave */
-        cv_pset(x, (int32_t)VIZ_H / 2 + SINE[((uint32_t)x * 6u + ph * 2u) & 1023u] * 6 / 32768, D_DIM);
+    viz_back();
     for (p = 0; p < NPART; p++)
         for (i = 0; i < NVOICE; i++) {
             const voice_t *v = &trk[p].v[i];
-            int32_t lvl, cx, cy;
+            int32_t lvl, x, y, rad;
             if (!v->active || (lvl = v->env_out >> 10) < 1)       /* (Q15 -> 0..32) */
                 continue;
-            cx = ((int32_t)v->note - 28) * 240 / 76;
-            cy = (int32_t)VIZ_H / 2 + SINE[(v->note * 97u + ph * (3u + p)) & 1023u] * 28 / 32768;
-            d_glow(cx, cy, 5 + lvl / 3 + (p == DRIFT_PAD ? 4 : 0), DRIFT_PCOL[p], (uint32_t)(10 + lvl / 2));
+            if (viz_place(p, i, v->note, lvl, &x, &y, &rad))
+                d_glow(x, y, rad, DRIFT_PCOL[p], (uint32_t)(10 + lvl / 2));
         }
     cv_blit(0, VIZ_Y);
 }
