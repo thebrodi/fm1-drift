@@ -3,10 +3,12 @@
 /* DRIFT: the panel and the screen (the main loop). With FELUCCA_DRIFT, felucca.c (and the browser build) call these in
  * place of Felucca's ui_input / ui_leds / ui_draw; Felucca's UI is still built (main.c's crash, update and UBOOT
  * screens use its drawing) but never runs. One page, no menus: every control does one thing (DRIFT.md).
- *   KNOB 1..4  SPACE (reverb), ECHO (delay), GLOW (FM brightness), MOTION (chorus and drift)
+ *   KNOB 1..4  SPACE (reverb), ECHO (delay), GLOW (FM brightness), MOTION (how busy the player is, chorus, drift)
+ *   PLAY       the player on / off
+ *   ALGORITHM  the player's style
  *   OCT- OCT+  the register, one octave down / up
  *   PRESETS    the sound (one for now)
- * The keys play in the audio ISR (drift_play.c). */
+ * The keys and the player run in the audio ISR (drift_play.c). */
 
 /* -------------------------------------------------------------- sound --- */
 typedef struct {
@@ -39,6 +41,7 @@ static void drift_apply(void)
     pad->p[P_CHOR] = (int16_t)mo;
     pad->p[P_E0 + 6] = (int16_t)(mo / 2);                /* FM6 DTUN: the operators drift apart */
     pad->p[P_SPRD] = (int16_t)(40 + mo / 2);
+    drift_motion = (uint8_t)mo;
 }
 
 static void drift_load(uint32_t s)
@@ -52,13 +55,13 @@ static void drift_load(uint32_t s)
     set_engine_of(bell, ENGI_FM6);
     apply_preset_to(bell, d->bell_preset);
     pad->p[P_VOICE] = V_POLY;
-    pad->p[P_LEVEL] = 100;
+    pad->p[P_LEVEL] = 94;
     pad->p[P_ATK] = 72;                                  /* slow swell in, long tail out */
     pad->p[P_DEC] = 90;
     pad->p[P_SUS] = 112;
     pad->p[P_REL] = 104;
     bell->p[P_VOICE] = V_POLY;
-    bell->p[P_LEVEL] = 78;
+    bell->p[P_LEVEL] = 112;
     bell->p[P_REL] = 100;
     bell->p[P_PAN] = 20;
     for (i = 2; i < NTRK; i++)                           /* the other parts are silent */
@@ -92,8 +95,16 @@ static void drift_input(void)
         }
     if ((s = panel_enc(EN_PRESET)) != 0)
         drift_load((uint32_t)((int32_t)drift_sound + s + (int32_t)DRIFT_NSOUNDS * 8));
-    panel_enc(EN_ALGO);                                  /* (styles and patterns: not yet) */
-    panel_enc(EN_SELECT);
+    if ((s = panel_enc(EN_ALGO)) != 0) {
+        int32_t v = (int32_t)drift_style + (s > 0 ? 1 : -1);
+        drift_style = (uint8_t)(v < 0 ? 0 : v >= DS_N ? DS_N - 1 : v);
+        drift_redraw = 1;
+    }
+    panel_enc(EN_SELECT);                                /* (patterns: not yet) */
+    if ((pressed >> panel.btn[B_PLAY]) & 1u) {
+        drift_run = !drift_run;
+        drift_redraw = 1;
+    }
     if ((pressed >> panel.btn[B_OCTDN]) & 1u && drift_oct > -1) {
         drift_oct--;
         drift_redraw = 1;
@@ -123,6 +134,8 @@ static void drift_leds(void)
     }
     led_put(nl, panel.btn[B_OCTDN], drift_oct < 0);
     led_put(nl, panel.btn[B_OCTUP], drift_oct > 0);
+    if (drift_run)                                       /* PLAY green while the player plays */
+        nl[LED_PLAY_GREEN >> 3] |= (uint8_t)(1u << (LED_PLAY_GREEN & 7u));
     fm1_led_dim_level(1);
     for (c = 0; c < FM1_NCOL; c++) {
         fm1_led_dim[c] = nd[c];
@@ -213,6 +226,7 @@ static void drift_draw(void)
         lcd_fill(0, 0, 240, 240, D_BG);
         draw_text_line(12, 10, 100, &AF_S, "DRIFT", D_MID, D_BG, 0);
         draw_text_line(120, 10, 108, &AF_S, DRIFT_SOUNDS[drift_sound].name, D_TEXT, D_BG, 2);
+        draw_text_line(12, 70, 216, &AF_S, DRIFT_STYLE[drift_style], drift_run ? D_WARM : D_DIM, D_BG, 1);
         draw_text_line(12, 226, 216, &AF_S, drift_oct < 0 ? "OCT -1" : drift_oct > 0 ? "OCT +1" : "", D_DIM, D_BG, 1);
         drift_draw_knobs();
         drift_redraw = 0;
@@ -221,9 +235,9 @@ static void drift_draw(void)
     if (seen != drift_seen) {                            /* the chord: its degree and colour */
         seen = drift_seen;
         if (drift_deg < 0) {
-            s = "PLAY A WHITE KEY";
+            s = drift_run ? "" : "PLAY A WHITE KEY";
+            draw_text_line(0, 40, 240, &AF_M, "", D_MID, D_BG, 1);
             draw_text_line(0, 44, 240, &AF_S, s, D_MID, D_BG, 1);
-            lcd_fill(0, 62, 240, 18, D_BG);
         } else {
             for (s = DRIFT_ROMAN[drift_deg]; *s && n < 8u; s++)
                 b[n++] = *s;
@@ -234,7 +248,6 @@ static void drift_draw(void)
             }
             b[n] = 0;
             draw_text_line(0, 40, 240, &AF_M, b, D_TEXT, D_BG, 1);
-            lcd_fill(0, 62, 240, 18, D_BG);
         }
     }
     if (++frame & 1u)                                    /* the lights at ~30 frames a second */

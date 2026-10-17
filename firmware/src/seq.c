@@ -1372,7 +1372,7 @@ static void events_block(uint32_t n)
         t->aholdp = t->p[P_AHOLD];
     }
 #if FELUCCA_DRIFT
-    drift_block();
+    drift_block(n);
 #else
     keyboard_block();
 #endif

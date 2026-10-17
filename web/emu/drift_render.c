@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
 /* DRIFT, heard without a browser: the browser build (felucca_web.c) compiled natively, playing a short progression on
- * the keys (I - vi - IV - Vsus4), written as a 16-bit stereo WAV, with its peak and RMS printed.
+ * the keys (I - vi - IV - Vsus4), then the player in each style (DRIFT RIPPLE SWELL CHIME PULSE, 8 s each), written as a 16-bit stereo WAV, with its peak and RMS printed.
  *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -o build/drift_render web/emu/drift_render.c -lm
  *   build/drift_render OUT.wav */
 #include "felucca_web.c"
@@ -59,6 +59,23 @@ int main(int argc, char **argv)
     chord(18, -1, 3000);                           /* IV  (place 10) */
     chord(19, 20, 3000);                           /* V   (place 11) with black place 8: SUS4 */
     web_keys(0);
+    render(2000);
+    {   /* the player: each style for 8 s over a chord tapped at its start (I, vi, IV, ii, V) */
+        static const uint8_t KEY[DS_N] = {12, 21, 18, 14, 19};
+        uint32_t st;
+        web_buttons(1u << B_PLAY);
+        render(20);
+        web_buttons(0);
+        for (st = 0; st < DS_N; st++) {
+            drift_style = (uint8_t)st;
+            chord(KEY[st], -1, 300);
+            web_keys(0);
+            render(7700);
+        }
+        web_buttons(1u << B_PLAY);
+        render(20);
+        web_buttons(0);
+    }
     render(5000);                                  /* the tails */
     fseek(out, 4, SEEK_SET);
     put32(36u + frames * 4u);
