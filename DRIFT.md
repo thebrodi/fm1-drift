@@ -171,8 +171,11 @@ solid discs on deep navy; nothing glows.
 
 The worlds' pictures: GLASS an orbit, EMBER a low warm line with rising embers, DUSK a slow horizon
 wave, NIGHT stars, NEON an 80s grid, LOFI slow rain, BOWLS rings opening with each bowl, GARDEN
-fireflies, FOREST bands of mist with lights drifting down; the five newer worlds (OCEAN … CRYSTAL) float on
-a slow wave.
+fireflies, FOREST bands of mist with lights drifting down, OCEAN three rolling waves with the notes bobbing
+on them like buoys, RAIN drops falling onto a still surface (each bell a ripple ring where it lands), CAVE
+stalactites with each note trailing smaller, fainter echoes, HANDPAN the instrument from above (shell, dome and
+tone fields; each note lights its field, the pad the dome), CRYSTAL a cluster of crystals whose facets flash with
+sparkles.
 
 At power-on a splash shows a planet with two moons, DRIFT and the version. Colours: deep navy, with
 pastel sky, lilac, rose, mint and peach.

@@ -444,6 +444,33 @@ static void viz_ring(int32_t cx, int32_t cy, int32_t rx, int32_t ry, uint16_t c,
         d_dot(cx + v_sin(k * 1024u / n + 256u, rx), cy + v_sin(k * 1024u / n, ry), c, a);
 }
 
+/* OCEAN: the height of wave k (0 the front) at x */
+static int32_t viz_wave(int32_t x, uint32_t k)
+{
+    return (int32_t)VIZ_H / 2 + 6 + (int32_t)k * 12 + v_sin((uint32_t)x * (5u + k * 2u) + viz_ph * (3u - k), 5 - (int32_t)k);
+}
+
+/* CRYSTAL: the facets of a cluster of three crystals (lines x0 y0 x1 y1), and the points where sparkles sit */
+static const int16_t FACET[][4] = {
+    {96, 86, 110, 22}, {110, 22, 124, 86}, {110, 22, 112, 86},                      /* the tall one */
+    {70, 86, 82, 44}, {82, 44, 96, 86}, {82, 44, 86, 86},                           /* the left */
+    {124, 86, 140, 38}, {140, 38, 154, 86}, {140, 38, 142, 86},                     /* the right */
+    {150, 86, 162, 60}, {162, 60, 172, 86},                                         /* a small one */
+};
+static const int16_t SPARK[8][2] = {{110, 22}, {82, 44}, {140, 38}, {162, 60}, {104, 50}, {118, 60}, {88, 64}, {146, 66}};
+
+/* HANDPAN: where tone field k (0 the centre dome, 1..8 the ring) sits */
+static void viz_field(uint32_t k, int32_t *x, int32_t *y)
+{
+    if (!k) {
+        *x = 120;
+        *y = (int32_t)VIZ_H / 2;
+        return;
+    }
+    *x = 120 + v_sin((k - 1u) * 128u + 256u, 64);
+    *y = (int32_t)VIZ_H / 2 + v_sin((k - 1u) * 128u, 28);
+}
+
 /* the picture behind the lights */
 static void viz_back(void)
 {
@@ -490,6 +517,43 @@ static void viz_back(void)
             for (x = 0; x < w; x += 2)
                 if (!(x & 3))
                     d_dot(x, m - 18 + (int32_t)i * 18 + v_sin((uint32_t)x * 4u + viz_ph + i * 300u, 4), D_MINT, 3);
+        break;
+    case 9:                                              /* OCEAN: three rolling waves, the far ones fainter */
+        for (i = 0; i < 3u; i++)
+            for (x = 0; x < w; x++)
+                d_dot(x, viz_wave(x, i), D_SKY, 14u - i * 4u);
+        break;
+    case 10:                                             /* RAIN: drops falling straight onto a still surface */
+        d_hline(0, w, h - 12, D_LILAC, 6);
+        for (i = 0; i < 18u; i++) {
+            r = r * 1664525u + 1013904223u;
+            x = (int32_t)(r >> 8) % w;
+            y = (int32_t)(((r >> 20) + viz_ph * (3u + (r >> 30))) % (uint32_t)(h - 12));
+            d_line(x, y, x, y + 4, D_SKY, 9);
+        }
+        break;
+    case 11:                                             /* CAVE: stalactites hanging from the dark */
+        d_hline(0, w, 0, D_DIM, 32);
+        for (x = 6, i = 0; x < w; x += 14, i++) {
+            r = r * 1664525u + 1013904223u;
+            y = 8 + (int32_t)((r >> 24) % 22u);
+            d_line(x - 4, 0, x, y, D_LILAC, 6);
+            d_line(x + 4, 0, x, y, D_LILAC, 6);
+            if ((viz_ph / 4u + i * 7u) % 60u == 0u)      /* now and then a drop */
+                d_dot(x, y + 2, D_SKY, 12);
+        }
+        break;
+    case 12:                                             /* HANDPAN: from above, the shell, the dome, the tone fields */
+        viz_ring(120, m, 92, 40, D_DIM, 32);
+        viz_ring(120, m, 12, 7, D_LILAC, 9);
+        for (i = 1; i <= 8u; i++) {
+            viz_field(i, &x, &y);
+            viz_ring(x, y, 9, 5, D_LILAC, 7);
+        }
+        break;
+    case 13:                                             /* CRYSTAL: a cluster of crystals, their facets thin lines */
+        for (i = 0; i < sizeof FACET / sizeof FACET[0]; i++)
+            d_line(FACET[i][0], FACET[i][1], FACET[i][2], FACET[i][3], D_LILAC, i % 3u == 2u ? 4u : 8u);
         break;
     case 2:                                              /* DUSK: the horizon, a slow wave */
     default:                                             /* GARDEN: nothing but the fireflies */
@@ -543,6 +607,40 @@ static int viz_place(uint32_t p, uint32_t i, uint32_t n, int32_t lvl, int32_t *x
         *x = px + v_sin(viz_ph * 2u + n * 61u, 14);
         *y = (int32_t)((viz_ph / 3u + n * 23u + i * 17u) % (uint32_t)(h + 10)) - 5;
         break;
+    case 9:                                              /* OCEAN: bobbing on the front wave like buoys */
+        *x = px;
+        *y = viz_wave(px, 0) - 4 - lvl / 6;
+        break;
+    case 10:                                             /* RAIN: a drop landing makes a ring on the surface; the rest float */
+        if (p == DRIFT_BELL) {
+            int32_t rx = 3 + (32 - lvl) * 2;
+            viz_ring(px, h - 12, rx, rx / 4 + 1, DRIFT_PCOL[p], 6u + (uint32_t)lvl / 3u);
+            return 0;
+        }
+        *x = px;
+        *y = m - 10 + v_sin(a, 16);
+        break;
+    case 11:                                             /* CAVE: a light, and its echoes trailing off smaller and fainter */
+        *x = px;
+        *y = m + 10 + v_sin(a, 12);
+        d_disc(*x + 14, *y + 6, 2 + lvl / 10, DRIFT_PCOL[p], (uint32_t)lvl / 4u + 2u);
+        d_disc(*x + 26, *y + 11, 1 + lvl / 16, DRIFT_PCOL[p], (uint32_t)lvl / 8u + 1u);
+        break;
+    case 12: {                                           /* HANDPAN: the note's tone field lights up (the pad: the dome) */
+        uint32_t k = p == DRIFT_PAD ? 0u : 1u + (n * 5u) % 8u;
+        viz_field(k, x, y);
+        *rad = 4 + lvl / 3;
+        break;
+    }
+    case 13: {                                           /* CRYSTAL: a sparkle on a point of the crystals */
+        uint32_t k = (n * 3u + p) % 8u;
+        int32_t s = 2 + lvl / 4;
+        uint16_t c = d_tone(DRIFT_PCOL[p], 6u + (uint32_t)lvl / 2u);
+        cv_line(SPARK[k][0] - s, SPARK[k][1], SPARK[k][0] + s, SPARK[k][1], c);
+        cv_line(SPARK[k][0], SPARK[k][1] - s, SPARK[k][0], SPARK[k][1] + s, c);
+        d_disc(SPARK[k][0], SPARK[k][1], 2, DRIFT_PCOL[p], 6u + (uint32_t)lvl / 2u);
+        return 0;
+    }
     default:                                             /* DUSK, LOFI: floating on a slow wave */
         *x = px;
         *y = m + v_sin(a, 28);
