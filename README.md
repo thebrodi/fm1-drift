@@ -10,6 +10,14 @@ good. No menus, no drums.
 
 > **Work in progress.** Drift runs in the browser emulator. It has not been flashed to an FM-1 yet.
 
+## Why Drift
+
+I'm not a music expert, and Drift isn't meant to be a full synthesizer. It deliberately limits what the FM-1 can do:
+fewer functions and fewer options, so all that's left is playing melodic, dreamy, drifting sounds. I use it for live
+meditation, together with my singing bowls: slow, soft and relaxing, with nothing to get lost in.
+
+If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelton/Felucca), which Drift is built on.
+
 ## How to play
 
 | Control | Does |
@@ -19,14 +27,15 @@ good. No menus, no drums.
 | **KNOB 2 — Echo** | Delay repeats |
 | **KNOB 3 — Glow** | Dark and warm → bright and glassy |
 | **KNOB 4 — Motion** | Still and sparse → busy and moving |
-| **White keys** | Layers on / off (lit = playing): PAD, BASS, ARP, SPARKLE, MELODY, CHOIR, SHIMMER |
-| **Black keys** | Chords to jump to (vi ii IV V I, then the same with add9): press to go, hold to stay |
-| **PRESETS** | The world: GLASS, EMBER, DUSK (sounds, key, tempo) |
+| **White keys** | Layers on / off (lit = playing): PAD, BASS, ARP, SPARKLE, MELODY, VOX, SHIMMER |
+| **Black keys** | Chords to jump to (vi ii IV V I, then the same with add9): press to go, hold to stay, let go to carry on |
+| **PRESETS** | The world: GLASS, EMBER, DUSK, NIGHT, NEON, LOFI, BOWLS, GARDEN, FOREST (sounds, key, tempo) |
 | **ALGORITHM** | The behaviour: DRIFT, RIPPLE, SWELL, CHIME, PULSE |
 | **SELECT** | The progression: DRONE, HOME, FLOAT, LONGING, RISE, WANDER |
 | **OCT− / OCT+** | Everything an octave down / up |
 
-The full design and its rules are in [DRIFT.md](DRIFT.md).
+The worlds range from glassy bells and warm electric piano to a dark minor pad, 80s strings, lo-fi keys, a singing
+bowl over a drone, a kalimba and a soft flute. The full design and its rules are in [DRIFT.md](DRIFT.md).
 
 ## Try it in your browser
 

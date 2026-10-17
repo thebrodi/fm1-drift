@@ -7,7 +7,8 @@
  *   Black keys: chords to jump to (vi ii IV V I from the left; the upper ones the same chords, add9): pressed, the music
  *   moves there; held, it stays; let go, the progression carries on from there.
  *   ALGORITHM: how every layer behaves (DS_*: how long a chord lasts, how often each layer plays).
- * Every note comes from the major scale of drift_root and mostly from the chord sounding now: nothing can clash.
+ * Every note comes from the scale of the world (major or natural minor, from drift_root) and mostly from the chord
+ * sounding now: nothing can clash.
  * Parts: PAD and SHIMMER on part 1, ARP SPARKLE MELODY on part 2 (struck bells), BASS on 3, CHOIR on 4. The FM-1
  * sounds 8 voices across the parts (core.h NVOICE), so the held layers use at most 6 (pad 3, shimmer 1, bass 1,
  * choir 1) and leave the bells room. */
@@ -16,18 +17,20 @@
 #define DRIFT_BASS 2u
 #define DRIFT_CHOIR 3u
 enum { DL_PAD, DL_BASS, DL_ARP, DL_SPARKLE, DL_MELODY, DL_CHOIR, DL_SHIMMER, DL_N };
-static const char *const DRIFT_LAYER[DL_N] = {"PAD", "BASS", "ARP", "SPARK", "MEL", "CHOIR", "SHIM"};
-static const int8_t DRIFT_BLACK[5] = {5, 1, 3, 4, 0};   /* the chord of each black key of a group: vi ii IV V I */
+static const char *const DRIFT_LAYER[DL_N] = {"PAD", "BASS", "ARP", "SPARK", "MEL", "VOX", "SHIM"};
+/* the chord of each black key of a group: major vi ii IV V I, minor VI iv v VII i (no diminished chord in either) */
+static const int8_t DRIFT_BLACK[2][5] = {{5, 1, 3, 4, 0}, {5, 3, 4, 6, 0}};
+static const int8_t DRIFT_WANDER[2][5] = {{0, 1, 3, 4, 5}, {0, 2, 3, 5, 6}};   /* the chords WANDER visits */
 enum { DS_DRIFT, DS_RIPPLE, DS_SWELL, DS_CHIME, DS_PULSE, DS_N };
 static const char *const DRIFT_STYLE[DS_N] = {"DRIFT", "RIPPLE", "SWELL", "CHIME", "PULSE"};
-static const uint8_t DRIFT_SCALE[7] = {0, 2, 4, 5, 7, 9, 11};
+static const uint8_t DRIFT_SCALE[2][7] = {{0, 2, 4, 5, 7, 9, 11}, {0, 2, 3, 5, 7, 8, 10}};   /* major, natural minor */
 
 /* ------------------------------------------------------- progressions --- */
 #define DP_WANDER 5u
 static const char *const DRIFT_PROG[] = {"DRONE", "HOME", "FLOAT", "LONGING", "RISE", "WANDER"};
 #define DP_N (sizeof DRIFT_PROG / sizeof DRIFT_PROG[0])
 static const int8_t PROG[DP_N][5] = {      /* scale degrees 0..6 (I..vii), -1 ends; WANDER: the chords it may visit */
-    {0, -1}, {0, 5, 3, 4, -1}, {0, 3, -1}, {5, 3, 0, 4, -1}, {3, 4, 2, 5, -1}, {0, 1, 3, 4, 5},
+    {0, -1}, {0, 5, 3, 4, -1}, {0, 3, -1}, {5, 3, 0, 4, -1}, {3, 4, 2, 5, -1}, {0, -1},   /* (WANDER: DRIFT_WANDER) */
 };
 
 /* -------------------------------------------------------- behaviours --- */
@@ -54,6 +57,7 @@ static volatile uint8_t drift_prog = 1;  /* SELECT: the progression */
 static volatile uint8_t drift_motion = 50;   /* KNOB 4: 0..127 */
 static volatile int8_t drift_oct;        /* OCT- / OCT+: -1 .. +1 */
 static volatile uint8_t drift_root = 2;  /* the world's key (D) */
+static volatile uint8_t drift_minor;     /* the world's mode: 0 major, 1 natural minor */
 static volatile uint8_t drift_bpm = 72;  /* the world's tempo */
 static volatile uint8_t drift_resync;    /* the UI reloaded the parts' sounds: start the held notes again */
 static volatile uint8_t drift_layers = 1u << DL_PAD | 1u << DL_MELODY;   /* the layers on (bit DL_*) */
@@ -67,7 +71,7 @@ static volatile uint8_t drift_seen;      /* bumped when the chord or a toggle ch
 static int32_t drift_step(int32_t s)     /* a scale step of the key: semitones above drift_root (negative too) */
 {
     int32_t o = s >= 0 ? s / 7 : -((6 - s) / 7);
-    return 12 * o + DRIFT_SCALE[s - 7 * o];
+    return 12 * o + DRIFT_SCALE[drift_minor & 1u][s - 7 * o];
 }
 static int32_t drift_fold(int32_t n, int32_t lo)   /* n moved by octaves into [lo, lo + 12) */
 {
@@ -232,7 +236,7 @@ static void drift_advance(void)
     if (drift_prog % DP_N == DP_WANDER) {
         int8_t d;
         do
-            d = p[drift_rand(5u)];
+            d = DRIFT_WANDER[drift_minor & 1u][drift_rand(5u)];
         while (d == drift_cur);
         drift_cur = d;
     } else {
@@ -297,7 +301,7 @@ static void drift_keys_block(void)
             drift_voice_held();
         } else if (drift_run) {                          /* a chord: there now, and held while the key is */
             drift_pin = (uint8_t)p;
-            drift_jump(DRIFT_BLACK[p % 5u], p >= 5u);
+            drift_jump(DRIFT_BLACK[drift_minor & 1u][p % 5u], p >= 5u);
         }
         drift_seen++;
     }

@@ -1,7 +1,8 @@
 # Drift — design
 
 Drift is a firmware for the M-VAVE FM-1, forked from Felucca. It is a small, simple instrument for
-dreamy, ambient music that always sounds good: it keeps playing by itself, and you steer it live.
+dreamy, ambient, meditative music that always sounds good: it keeps playing by itself, and you steer
+it live. It is made for live meditation, alongside real singing bowls: slow, soft, never busy.
 
 Inspiration: the HiChord (everything you press fits) and the OP-1's generative playing (press play,
 it plays on, you shape it live).
@@ -51,11 +52,11 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 | 3 | ARP | The chord's tones rippling up and down (FM bell) |
 | 4 | SPARKLE | High, quiet bell notes |
 | 5 | MELODY | Slow single notes floating in the middle |
-| 6 | CHOIR | One voice gliding between the chord's tones ("aah") |
+| 6 | VOX | One voice gliding between the chord's tones (a choir "aah", or a breathy whisper) |
 | 7 | SHIMMER | A high note above the pad, an octave up |
 
 PAD and MELODY are on at power-on. The FM-1 sounds 8 voices at once across 4 parts, so the layers
-share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), CHOIR (part 4).
+share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), VOX (part 4).
 
 ### Chords (black keys)
 
@@ -86,32 +87,52 @@ sounding now is lit, so you can see where you are.
 DRONE (one chord), HOME (I vi IV V), FLOAT (I IV), LONGING (vi IV I V), RISE (IV V iii vi),
 WANDER (moves at random between chords that fit).
 
+In a minor world the same progressions turn minor (HOME: i VI iv v), and the black keys play
+VI iv v VII i (no diminished chords, so nothing sounds harsh).
+
 ### Worlds (PRESETS)
 
-GLASS (D, 72 BPM, glass pad and bells), EMBER (A, 66 BPM, warm pad and electric piano), DUSK
-(F, 80 BPM, pad and wooden mallets).
+A world is a whole mood: the key and its mode, the tempo, and the sound of each part. Drift's own FM
+patches (`tools/gen_drift_patches.py`: bowl, drone, dark pad, crystal, kalimba, soft keys) are loaded
+into a part as its own patch; Felucca's factory sounds stay as they are.
+
+| World | Key | BPM | Pad | Bells (ARP, SPARKLE, MELODY) | VOX |
+|---|---|---|---|---|---|
+| GLASS | D major | 72 | FM pad | glass bell | choir |
+| EMBER | A major | 66 | FM pad | electric piano | choir |
+| DUSK | F major | 80 | FM pad | wooden mallets | choir |
+| NIGHT | E minor | 60 | dark FM pad | glass bell | whisper |
+| NEON | G major | 84 | 80s PWM strings | 80s crystal bell | choir |
+| LOFI | E♭ major | 70 | soft analog pad | soft lo-fi keys | whisper |
+| BOWLS | C minor | 56 | warm drone | singing bowl (rings ~20 s) | choir |
+| GARDEN | A major | 64 | warm drone | kalimba | choir |
+| FOREST | E minor | 58 | FM pad | soft flute | whisper |
+
+Every world uses the same sub bass. Levels are measured so the pad, the bells and the voice sit
+within a few dB of each other in every world.
 
 ## Screen
 
-One page, nothing to navigate:
+One page, plain, nothing to navigate:
 
 | Where | Shows |
 |---|---|
-| Top | Play mark, world, key and tempo, octave |
-| Knob cards | SPACE, ECHO, GLOW, MOTION: each value large in its own colour, with a bar (the knobs come first) |
-| Scene | The world's picture with the sounding notes as soft lights: GLASS orbits, EMBER a drifting cloud, DUSK a dune under the moon. Turning PRESETS, ALGORITHM or SELECT shows its new name here for a moment |
-| Layers | The seven layers, a dot when on, a bar that moves as each one plays |
-| Bottom | The progression with the chord now underlined (or the chord and HELD while a black key holds it), the bars it has left, the behaviour |
+| Top | The three choices: world (PRESETS), progression (SELECT), behaviour (ALGORITHM) |
+| Below | The chord now (`vi`, `V add9  HELD`), or PRESS PLAY |
+| Layers | The seven layers, underlined while on |
+| Middle | The sounding notes as soft lights over a slow horizon, each part in its own colour |
+| Knobs | SPACE, ECHO, GLOW, MOTION: name and bar, each in its own colour |
+| Bottom | Key, mode and tempo; the octave when shifted |
 
-At power-on a splash shows a small planet and DRIFT. Colours: deep navy, with pastel sky, lilac,
+At power-on a splash shows a soft planet and DRIFT. Colours: deep navy, with pastel sky, lilac,
 rose, mint and peach.
 
 ## Sound
 
-- FM voices (Felucca's open 6-operator engine, `fm6_core.c`, or a lighter 2–4 operator voice if the
-  CPU needs it), tuned for pads and bells.
+- Felucca's engines: FM6 (6-operator FM) for pads and bells, ANALOG for the sub bass and some pads,
+  VOICE (formant) for the choir and whisper, WHEEL for the flute.
 - One shared reverb and one shared delay.
-- A limiter at the end of the chain.
+- No limiter: the levels are set so that everything on at once peaks around −11 dBFS.
 
 ## Where it lives
 
