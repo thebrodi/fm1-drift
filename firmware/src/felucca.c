@@ -115,5 +115,11 @@
 #if FELUCCA_CDC
 #include "console.c"
 #endif
+#if FELUCCA_DRIFT
+#include "drift_ui.c"             /* DRIFT: the panel and the screen; main.c's loop calls these */
+#define ui_input drift_input
+#define ui_leds drift_leds
+#define ui_draw drift_draw
+#endif
 #include "master.c"              /* the MASTER pot (#137: read before the audio starts) */
 #include "main.c"

@@ -167,6 +167,9 @@ static void lcd_init(void) {}
 #include "../../firmware/src/ui_menu.c"
 #include "../../firmware/src/ui_input.c"
 #include "../../firmware/src/ui_layer.c"
+#if FELUCCA_DRIFT
+#include "../../firmware/src/drift_ui.c"
+#endif
 
 /* ------------------------------------------------------------ the flash --- */
 static uint32_t web_flash_writes;
@@ -252,6 +255,11 @@ static void cdc_task(void) {}
 #define usb_start() ((void)0)
 #define usb_retry(ms) ((void)(ms))
 #define usb_detach() ((void)0)
+#if FELUCCA_DRIFT                                 /* as felucca.c: DRIFT's panel and screen */
+#define ui_input drift_input
+#define ui_leds drift_leds
+#define ui_draw drift_draw
+#endif
 #include "../../firmware/src/master.c"
 #include "../../firmware/src/main.c"
 #undef usb_poll

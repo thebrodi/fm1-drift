@@ -1293,6 +1293,9 @@ static int32_t click_beat_now(void)
 }
 
 /* everything that happens between two rendered blocks */
+#if FELUCCA_DRIFT
+#include "drift_play.c"             /* DRIFT: the keys play chords (drift_block, below) */
+#endif
 static void events_block(uint32_t n)
 {
     uint32_t i, pr, seq_n = n;
@@ -1368,7 +1371,11 @@ static void events_block(uint32_t n)
         t->armp = t->p[P_AMODE];
         t->aholdp = t->p[P_AHOLD];
     }
+#if FELUCCA_DRIFT
+    drift_block();
+#else
     keyboard_block();
+#endif
     while (mi_r != mi_w) {                            /* USB-MIDI (and TRS) in */
         uint32_t at = mi_r % MQ, pkt = midi_in_q[at], status = (pkt >> 8) & 0xFFu;
         uint32_t st = status & 0xF0u, ch = status & 0x0Fu;
