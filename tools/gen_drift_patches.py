@@ -47,18 +47,28 @@ PATCHES = [
     # An 80s crystal bell: a bright tine on top of a glassy body, a little chorus of detune.
     ("CRYSTAL", voice("CRYSTAL", 5, [
         op(r=(99, 38, 25, 40), l=(99, 70, 0, 0), ol=96, kvs=2, det=5),
-        op(r=(99, 55, 35, 50), l=(99, 40, 0, 0), ol=74, fc=14, kvs=5),
+        op(r=(99, 55, 35, 50), l=(99, 40, 0, 0), ol=74, fc=14, kvs=5, bp=48, rd=60, rc=0),   # quieter up high (no fizz)
         op(r=(99, 35, 25, 40), l=(99, 75, 0, 0), ol=92, det=10),
-        op(r=(99, 45, 30, 45), l=(99, 60, 0, 0), ol=72, fc=3, ff=50, kvs=3),
+        op(r=(99, 45, 30, 45), l=(99, 60, 0, 0), ol=72, fc=3, ff=50, kvs=3, bp=48, rd=40, rc=0),
         op(r=(99, 32, 22, 38), l=(99, 80, 0, 0), ol=78, fc=2, det=7),
         op(r=(99, 50, 30, 45), l=(99, 50, 0, 0), ol=58, fc=1)],
         fb=2, lfs=34, lfd=30, lpmd=3, lfw=0, lpms=2)),
+    # A clear glass bell: Felucca's GLASS BELL (tools/gen_fm6_patches.py), its modulators softened above middle C, so
+    # high notes stay clear instead of fizzing.
+    ("CLEAR BELL", voice("CLEAR BELL", 5, [
+        op(r=(99, 40, 25, 35), l=(99, 80, 0, 0), ol=96, kvs=1),
+        op(r=(99, 35, 25, 35), l=(99, 70, 0, 0), ol=78, fc=3, ff=50, kvs=3, bp=48, rd=55, rc=0),
+        op(r=(99, 45, 30, 40), l=(99, 70, 0, 0), ol=84, fc=2, ff=38, det=9, kvs=1),
+        op(r=(99, 50, 30, 40), l=(99, 60, 0, 0), ol=70, fc=5, kvs=3, bp=48, rd=60, rc=0),
+        op(r=(99, 60, 40, 45), l=(99, 50, 0, 0), ol=78, fc=5, ff=40, det=5),
+        op(r=(99, 60, 40, 45), l=(99, 50, 0, 0), ol=60, bp=48, rd=50, rc=0)],
+        fb=0, lpms=0)),
     # A kalimba: a plucked metal tine, a quick bright overtone that falls away, a round body that rings on.
     ("KALIMBA", voice("KALIMBA", 5, [
         op(r=(99, 36, 24, 34), l=(99, 50, 0, 0), ol=98, kvs=2, rs=2),
-        op(r=(99, 80, 50, 60), l=(99, 0, 0, 0), ol=66, fc=6, ff=20, kvs=5, rs=3),
+        op(r=(99, 80, 50, 60), l=(99, 0, 0, 0), ol=62, fc=6, ff=20, kvs=4, rs=3, bp=48, rd=70, rc=0),   # softer up high
         op(r=(99, 32, 22, 32), l=(99, 60, 0, 0), ol=82, det=9, rs=2),
-        op(r=(99, 70, 45, 55), l=(99, 10, 0, 0), ol=52, fc=3, kvs=3),
+        op(r=(99, 70, 45, 55), l=(99, 10, 0, 0), ol=52, fc=3, kvs=3, bp=48, rd=50, rc=0),
         op(ol=0),
         op(ol=0)],
         fb=0, lpms=0)),

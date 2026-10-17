@@ -15,7 +15,7 @@
 /* A world (PRESETS) is a whole mood: the key and its mode, the tempo, and the sound of each of the four parts. A part
  * is an engine and one of its presets, then (FM6) one of DRIFT's own patches put in over it (tools/gen_drift_patches.py:
  * loaded as the part's own patch, Felucca's factory patches untouched), at a level that sits it in the mix. */
-#include "drift_fm6.h"                   /* DRIFT_FM6[]: BOWL, DRONE, DARK PAD, CRYSTAL, KALIMBA, SOFT KEYS */
+#include "drift_fm6.h"                   /* DRIFT_FM6[]: BOWL, DRONE, DARK PAD, CRYSTAL, CLEAR BELL, KALIMBA, SOFT KEYS */
 #define ENGI_ANALOG 0u                   /* engines.c ENGINES[] */
 #define ENGI_FORMANT 5u
 #define ENGI_WHEEL 7u
@@ -43,7 +43,7 @@ typedef struct {
 } drift_world_t;
 #define SUB {ENGI_ANALOG, AN_SUB_BASS, NO_PATCH, 88}
 static const drift_world_t DRIFT_WORLDS[] = {
-    {"GLASS", 2, 0, 72, {{ENGI_FM6, FM6_PAD, NO_PATCH, 102}, {ENGI_FM6, FM6_BELL, NO_PATCH, 112}, SUB},
+    {"GLASS", 2, 0, 72, {{ENGI_FM6, FM6_PAD, NO_PATCH, 102}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
      {FO_CHOIR, {0, 20, 70, 3, 30, 40, 72, 0}, 12, 82},             /* airy, high: "aah" opening to "eh" */
      RV_HALL, 60, DT_4, 64, DS_DRIFT, 1},
     {"EMBER", 9, 0, 66, {{ENGI_ANALOG, AN_STRINGS, NO_PATCH, 88}, {ENGI_FM6, FM6_TINE, NO_PATCH, 108}, SUB},
@@ -52,7 +52,7 @@ static const drift_world_t DRIFT_WORLDS[] = {
     {"DUSK", 5, 0, 80, {{ENGI_GRAIN, GR_CLOUD, NO_PATCH, 96}, {ENGI_FM6, FM6_MARIMBA, NO_PATCH, 127}, SUB},
      {FO_CHOIR, {127, 127, 0, -5, 18, 28, 38, 0}, -12, 93},         /* a low, soft hum */
      RV_ROOM, 70, DT_8D, 50, DS_PULSE, 4},
-    {"NIGHT", 4, 1, 60, {{ENGI_FM6, FM6_PAD, DF_DARK_PAD, 102}, {ENGI_FM6, FM6_BELL, NO_PATCH, 112}, SUB},
+    {"NIGHT", 4, 1, 60, {{ENGI_FM6, FM6_PAD, DF_DARK_PAD, 102}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
      {FO_WHISPER, {95, 127, 100, -6, 40, 112, 44, 0}, -12, 108},    /* a dark, low whisper */
      RV_HALL, 88, DT_2, 30, DS_SWELL, 3},
     {"NEON", 7, 0, 84, {{ENGI_ANALOG, AN_PWM_STR, NO_PATCH, 87}, {ENGI_FM6, FM6_BELL, DF_CRYSTAL, 108},
@@ -83,12 +83,13 @@ static uint8_t drift_head = 1;           /* the top and bottom lines */
 static uint8_t drift_bars = 0xF;         /* the knobs' bars (bit per knob) */
 static int16_t drift_cut[NPART];         /* an ANALOG part's own cutoff (GLOW moves it from there) */
 
-/* GLOW on one part: FM6 the modulators' level (MLVL), ANALOG the filter's cutoff around the preset's own */
+/* GLOW on one part: FM6 the modulators' level (MLVL), ANALOG the filter's cutoff around the preset's own. The bells take
+ * half its range: their bright overtones, all the way up on high notes, fold back as fizz */
 static void drift_glow(track_t *t, int32_t gl)
 {
     int32_t c;
     if (t->eng_req == ENGI_FM6)
-        t->p[P_E0 + 2] = (int16_t)(gl - 64);
+        t->p[P_E0 + 2] = (int16_t)(t == &trk[DRIFT_BELL] ? (gl - 64) / 2 : gl - 64);
     else if (t->eng_req == ENGI_ANALOG) {
         c = drift_cut[t - trk] + (gl - 56) / 2;
         t->p[P_E0 + 4] = (int16_t)(c < 0 ? 0 : c > 127 ? 127 : c);

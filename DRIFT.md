@@ -75,7 +75,8 @@ sounding now is lit, so you can see where you are.
 ### Behaviours (ALGORITHM)
 
 A behaviour is the character of the whole piece: its pace, how the pad breathes, how the melody
-moves and how often the other layers play. Each world starts in its own; ALGORITHM turns from there.
+moves and how often the other layers play. (The pad's attack only changes on the analog and granular pads: an FM6
+sound's own envelopes shape it.) Each world starts in its own; ALGORITHM turns from there.
 
 | Behaviour | Pace | Pad | Melody |
 |---|---|---|---|
@@ -166,6 +167,15 @@ python3 -m http.server -d build/emu 8790                                        
 The website (<https://thebrodi.github.io/fm1-drift/>) is the `gh-pages` branch: `tools/make_drift_site.py
 build/site` puts the landing page (`web/site/index.html`), the emulator (`try/`) and the installer (`install/`, once
 there is a package) together, and that folder is pushed as the branch.
+
+`tests/drift_test.c` plays the firmware natively: every world × behaviour with every layer on (clipping, clicks, DC,
+level band), then random playing for MINUTES (default 30): output finite and below clipping, notes in range, never
+more than 8 voices, never silent while the pad plays, silent 30–40 s after a stop. The build command is at the top of
+the file. Known rough edge: with GLOW at its maximum, OCT+ and a high ECHO, a bright chord of bells can fizz for a few
+seconds (two of six random seeds catch it).
+
+Felucca's own suite (`tests/run_tests.sh`) passes with `FELUCCA_DRIFT=0`; with Drift its tests of Felucca's keyboard,
+MIDI-out-of-keys, SONG grid and splash keys fail, as Drift replaces those by design.
 
 To hear it without a browser, `web/emu/drift_render.c` presses PLAY, adds the layers one by one, then goes through
 the behaviours, a progression and the black-key chords, into a WAV (the build command is at the top of the file; add

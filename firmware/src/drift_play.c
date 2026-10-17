@@ -147,8 +147,11 @@ static void drift_strike(uint32_t layer, uint32_t part, uint32_t note, uint32_t 
     printf("%7.2f s  %-6s  part %u  note %3u  vel %3u\n", fm1_ms / 1000.0, DRIFT_STYLE[drift_style], part + 1u, note,
            vel);
 #endif
-    if (note < 24u || note > 108u)
+    if (note < 24u)
         return;
+    if (part == DRIFT_BELL)
+        while (note > 96u)                               /* (C7: higher, the bright patches fold back as fizz) */
+            note -= 12u;
     if (part != DRIFT_BELL) {                        /* (the bass's pulse: its own held note, struck again) */
         trk_note_off(&trk[part], note);
         trk_note_on(&trk[part], note, vel);
@@ -210,6 +213,14 @@ static uint32_t drift_note(int32_t steps_above, int32_t lo)   /* a tone of the c
     return (uint32_t)drift_fold(drift_root + drift_step(drift_cur + steps_above), lo);
 }
 
+/* note n, raised by octaves until it is at least lo */
+static uint32_t drift_above(uint32_t n, uint32_t lo)
+{
+    while (n < lo)
+        n += 12u;
+    return n;
+}
+
 /* the held layers to the chord and the toggles now */
 static void drift_voice_held(void)
 {
@@ -229,6 +240,8 @@ static void drift_voice_held(void)
     }
     if (drift_run && (drift_layers >> DL_SHIMMER) & 1u) {
         want[n] = n ? (uint8_t)(want[n - 1u] + 12u) : (uint8_t)drift_note(4, lo + 12);
+        while (want[n] > 84u)                            /* (C6: higher, a bright pad turns thin and fizzy) */
+            want[n] = (uint8_t)(want[n] - 12u);
         n++;
     }
     if (n)
@@ -236,13 +249,17 @@ static void drift_voice_held(void)
     drift_hold_set(&drift_pad, want, n, 80);
     n = 0;
     if (drift_run && (drift_layers >> DL_BASS) & 1u)
-        want[n++] = (uint8_t)drift_note(0, lo - 22);
+        want[n++] = (uint8_t)drift_above(drift_note(0, lo - 22), 28u);   /* (E1, 41 Hz: lower, a small speaker loses it) */
     if (n)
         drift_act[DL_BASS] = 255;
     drift_hold_set(&drift_bass, want, n, 90);
     n = 0;
-    if (drift_run && (drift_layers >> DL_CHOIR) & 1u)
-        want[n++] = (uint8_t)drift_note(st[drift_choir_tone % 3u], lo + drift_vox_reg);
+    if (drift_run && (drift_layers >> DL_CHOIR) & 1u) {
+        uint32_t v = drift_above(drift_note(st[drift_choir_tone % 3u], lo + drift_vox_reg), 40u);   /* (E2 ..) */
+        while (v > 72u)                                  /* (.. C5: higher, the voice turns shrill) */
+            v -= 12u;
+        want[n++] = (uint8_t)v;
+    }
     if (n)
         drift_act[DL_CHOIR] = 255;
     drift_hold_set(&drift_choir, want, n, 76);
