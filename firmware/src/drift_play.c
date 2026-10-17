@@ -86,7 +86,8 @@ static const drift_beh_t DRIFT_BEH[DS_N] = {
 /* --------------------------------------------- shared with the UI ---- */
 static volatile uint8_t drift_run;       /* PLAY: the music asked for (the UI; a stop fades out first: drift_on) */
 static volatile uint8_t drift_on;        /* the music is going: notes come (from PLAY until its fade out has ended) */
-static volatile uint32_t drift_fade_in_ms = 4000u, drift_fade_out_ms = 6000u;   /* PLAY's fades (the tests: 0, none) */
+static volatile uint32_t drift_fade_in_ms, drift_fade_out_ms;   /* PLAY's fades: none (the MASTER knob is the hand's own
+                                                                 * fade); the machinery stays for the world change's dip */
 static volatile uint8_t drift_xf_req;    /* the UI: a world change, fade out (the ISR sets drift_xf_ready at silence) */
 static volatile uint8_t drift_xf_ready;  /* .. silent: the UI loads the new world, clears both, and it fades in */
 static volatile uint8_t drift_style;     /* ALGORITHM: DS_* */
@@ -400,7 +401,7 @@ static void drift_keys_block(void)
     }
 }
 
-/* the whole sound's level (Q24): PLAY fades it in and out, a world change dips it; applied to the mix (audio.c
+/* the whole sound's level (Q24): a world change dips it (PLAY's fades are off: drift_fade_in_ms); applied to the mix (audio.c
  * audio_block, before USB and the DAC) */
 #define DG_ONE (1 << 24)
 static int32_t drift_gain = DG_ONE, drift_gain_to = DG_ONE, drift_gain_step = DG_ONE;

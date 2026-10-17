@@ -24,7 +24,7 @@ If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelto
 
 | Control | Does |
 |---|---|
-| **PLAY** | Starts / stops the music, fading in (4 s) and out (6 s) |
+| **PLAY** | Starts / stops the music (fade by hand with the MASTER knob) |
 | **KNOB 1 — Space** | Reverb, from a small room to a huge hall |
 | **KNOB 2 — Echo** | Delay repeats |
 | **KNOB 3 — Glow** | Dark and warm → bright and glassy |

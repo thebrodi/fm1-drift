@@ -31,7 +31,7 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 
 | Control | Does |
 |---|---|
-| **PLAY** | Starts the music with a 4 s fade in; pressed again, a 6 s fade out, then it stops |
+| **PLAY** | Starts / stops the music; stopped, everything rings out (fade by hand with the MASTER knob) |
 | **KNOB 1 — Space** | Reverb: dry and close → a vast hall |
 | **KNOB 2 — Echo** | Delay: none → long repeating trails |
 | **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness, the analog pads' filter; the bells half as much) |

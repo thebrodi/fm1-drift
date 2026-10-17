@@ -270,11 +270,15 @@ static void drift_input(void)
         }
     if ((s = drift_turn(EN_PRESET)) != 0) {              /* playing: fade out, load at silence, fade in (drift_play.c) */
         drift_world_next = (uint8_t)(((int32_t)drift_world_next + s + (int32_t)DRIFT_NWORLDS) % (int32_t)DRIFT_NWORLDS);
-        if (drift_on && drift_fade_out_ms)
+        if (drift_on)
             drift_xf_req = 1;
         else
             drift_load(drift_world_next);
         drift_head = 1;
+    }
+    if (drift_xf_req && !drift_on && !drift_xf_ready) {  /* stopped during the dip: the new world at once */
+        drift_load(drift_world_next);
+        drift_xf_req = 0;
     }
     if (drift_xf_ready) {                                /* silent now: the new world, then the fade back in */
         drift_load(drift_world_next);
