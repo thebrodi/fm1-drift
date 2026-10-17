@@ -16,18 +16,15 @@
 /* A world (PRESETS) is a whole mood: the key and its mode, the tempo, and the sound of each of the four parts. A part
  * is an engine and one of its presets, then (FM6) one of DRIFT's own patches put in over it (tools/gen_drift_patches.py:
  * loaded as the part's own patch, Felucca's factory patches untouched), at a level that sits it in the mix. */
-#include "drift_fm6.h"                   /* DRIFT_FM6[]: BOWL, DRONE, DARK PAD, CRYSTAL, CLOUD, AIR, CLEAR BELL, KALIMBA,
-                                          * SOFT KEYS */
+#include "drift_fm6.h"                   /* DRIFT_FM6[]: Drift's own FM patches (tools/gen_drift_patches.py) */
 #define ENGI_ANALOG 0u                   /* engines.c ENGINES[] */
 #define ENGI_FORMANT 5u
 #define ENGI_WHEEL 7u
-#define ENGI_GRAIN 8u
 #define ENGI_NOISE 11u
 enum { FM6_TINE = 0, FM6_BELL = 1, FM6_PAD = 4, FM6_MARIMBA = 5 };   /* eng_fm6.c FM6_PRESETS */
 enum { AN_SOFT_PAD = 1, AN_SQR_BASS = 2, AN_PWM_STR = 3, AN_SUB_BASS = 7, AN_STRINGS = 11 };   /* eng_analog.c's */
 enum { FO_CHOIR = 0, FO_LEAD = 1, FO_WHISPER = 3 };                                        /* eng_formant.c's */
 enum { WH_SOFT_FLUTE = 3 };                                                   /* eng_wheel.c's */
-enum { GR_SHIMMER = 3 };                                                      /* eng_grain.c's */
 enum { NZ_WIND = 0, NZ_RAIN = 1 };                                            /* eng_noise.c's */
 enum { RV_ROOM, RV_SPRING, RV_HALL };                                         /* G_RTYPE */
 enum { DT_4 = 0, DT_8 = 1, DT_8T = 4, DT_2 = 6, DT_1 = 7, DT_8D = 10, DT_4D = 12 };   /* G_DTIME (params.c N_DTIME) */
@@ -51,45 +48,45 @@ static const drift_world_t DRIFT_WORLDS[] = {
     {"GLASS", 2, 0, 72, {{ENGI_FM6, FM6_PAD, NO_PATCH, 102}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
      {FO_CHOIR, {0, 20, 70, 3, 30, 40, 72, 0}, 12, 82},             /* airy, high: "aah" opening to "eh" */
      RV_HALL, 60, DT_4, 64, DS_DRIFT, 1},
-    {"EMBER", 9, 0, 66, {{ENGI_ANALOG, AN_STRINGS, NO_PATCH, 94}, {ENGI_FM6, FM6_TINE, NO_PATCH, 108}, SUB},
-     {FO_CHOIR, {100, 95, 0, -3, 46, 16, 60, 0}, 0, 86},            /* warm "ooh" */
+    {"EMBER", 9, 0, 66, {{ENGI_ANALOG, AN_STRINGS, NO_PATCH, 94}, {ENGI_FM6, FM6_TINE, NO_PATCH, 116}, SUB},
+     {FO_CHOIR, {100, 95, 0, -3, 46, 16, 60, 0}, 0, 91},            /* warm "ooh" */
      RV_SPRING, 80, DT_8T, 40, DS_RIPPLE, 2},
-    {"DUSK", 5, 0, 80, {{ENGI_FM6, FM6_PAD, DF_CLOUD, 110}, {ENGI_FM6, FM6_MARIMBA, NO_PATCH, 127}, SUB},
+    {"DUSK", 5, 0, 80, {{ENGI_FM6, FM6_PAD, DF_CLOUD, 110}, {ENGI_FM6, FM6_MARIMBA, DF_SOFT_WOOD, 127}, SUB},
      {FO_CHOIR, {127, 127, 0, -5, 18, 28, 38, 0}, -12, 93},         /* a low, soft hum */
      RV_ROOM, 70, DT_8D, 50, DS_PULSE, 4},
     {"NIGHT", 4, 1, 60, {{ENGI_FM6, FM6_PAD, DF_DARK_PAD, 102}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
-     {FO_WHISPER, {95, 127, 100, -6, 40, 112, 44, 0}, -12, 108},    /* a dark, low whisper */
+     {FO_WHISPER, {95, 127, 100, -6, 40, 112, 44, 0}, -12, 104},    /* a dark, low whisper */
      RV_HALL, 88, DT_2, 30, DS_SWELL, 3},
-    {"NEON", 7, 0, 84, {{ENGI_ANALOG, AN_PWM_STR, NO_PATCH, 87}, {ENGI_FM6, FM6_BELL, DF_CRYSTAL, 108},
+    {"NEON", 7, 0, 84, {{ENGI_ANALOG, AN_PWM_STR, NO_PATCH, 87}, {ENGI_FM6, FM6_BELL, DF_CRYSTAL, 102},
                         {ENGI_ANALOG, AN_SQR_BASS, NO_PATCH, 96}},
-     {FO_LEAD, {32, 64, 60, 2, 92, 6, 84, 0}, 0, 88},               /* an 80s machine voice */
+     {FO_LEAD, {32, 64, 60, 2, 92, 6, 84, 0}, 0, 92},               /* an 80s machine voice */
      RV_HALL, 50, DT_8D, 72, DS_PULSE, 1},
-    {"LOFI", 3, 0, 70, {{ENGI_ANALOG, AN_SOFT_PAD, NO_PATCH, 91}, {ENGI_FM6, FM6_TINE, DF_SOFT_KEYS, 110}, SUB},
+    {"LOFI", 3, 0, 70, {{ENGI_ANALOG, AN_SOFT_PAD, NO_PATCH, 91}, {ENGI_FM6, FM6_TINE, DF_SOFT_KEYS, 113}, SUB},
      {FO_CHOIR, {110, 110, 0, -4, 28, 52, 34, 0}, -12, 93},         /* a muffled hum, like old tape */
      RV_ROOM, 90, DT_8, 24, DS_RIPPLE, 3},
     {"BOWLS", 0, 1, 56, {{ENGI_FM6, FM6_PAD, DF_DRONE, 100}, {ENGI_FM6, FM6_BELL, DF_BOWL, 98}, SUB},
-     {FO_CHOIR, {127, 64, 127, -2, 112, 8, 122, 0}, -12, 88},       /* an overtone drone, slowly sweeping */
+     {FO_CHOIR, {127, 64, 127, -2, 112, 8, 122, 0}, -12, 82},       /* an overtone drone, slowly sweeping */
      RV_HALL, 66, DT_1, 40, DS_DRIFT, 0},
-    {"GARDEN", 9, 0, 64, {{ENGI_GRAIN, GR_SHIMMER, NO_PATCH, 106}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 112}, SUB},
-     {FO_CHOIR, {10, 40, 50, 2, 56, 14, 70, 40}, 0, 90},            /* a bright, open "ah", its vowel wandering */
+    {"GARDEN", 9, 0, 64, {{ENGI_FM6, FM6_PAD, DF_BLOOM, 118}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 119}, SUB},
+     {FO_CHOIR, {10, 40, 50, 2, 56, 14, 70, 40}, 0, 96},            /* a bright, open "ah", its vowel wandering */
      RV_SPRING, 60, DT_8T, 60, DS_CHIME, 2},
     {"FOREST", 4, 1, 58, {{ENGI_FM6, FM6_PAD, DF_AIR, 104}, {ENGI_WHEEL, WH_SOFT_FLUTE, NO_PATCH, 122}, SUB},
-     {FO_WHISPER, {120, 100, 90, 0, 24, 92, 54, 0}, 0, 94},        /* a breathy "hoo", like wind */
+     {FO_WHISPER, {120, 100, 90, 0, 24, 92, 54, 0}, 0, 99},        /* a breathy "hoo", like wind */
      RV_HALL, 76, DT_4D, 44, DS_DRIFT, 5},
     {"OCEAN", 2, 0, 54, {{ENGI_NOISE, NZ_WIND, NO_PATCH, 123}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
      {FO_CHOIR, {100, 95, 0, -3, 40, 20, 56, 0}, -12, 86},          /* a low "ooh" under the waves */
      RV_HALL, 80, DT_2, 36, DS_DRIFT, 2},
-    {"RAIN", 4, 1, 62, {{ENGI_NOISE, NZ_RAIN, NO_PATCH, 127}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 110}, SUB},
+    {"RAIN", 4, 1, 62, {{ENGI_NOISE, NZ_RAIN, NO_PATCH, 127}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 118}, SUB},
      {FO_CHOIR, {127, 127, 0, -5, 18, 30, 38, 0}, -12, 93},         /* a hum through the rain */
      RV_ROOM, 82, DT_8D, 40, DS_RIPPLE, 3},
     {"CAVE", 9, 1, 50, {{ENGI_FM6, FM6_PAD, DF_DARK_PAD, 107}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
-     {FO_CHOIR, {0, 100, 120, -6, 50, 26, 66, 0}, -12, 90},         /* a deep choir, "aah" closing to "ooh" */
+     {FO_CHOIR, {0, 100, 120, -6, 50, 26, 66, 0}, -12, 86},         /* a deep choir, "aah" closing to "ooh" */
      RV_HALL, 96, DT_1, 30, DS_SWELL, 0, -5},
     {"HANDPAN", 2, 1, 66, {{ENGI_FM6, FM6_PAD, DF_DRONE, 102}, {ENGI_FM6, FM6_MARIMBA, DF_HANDPAN, 112}, SUB},
      {FO_CHOIR, {100, 100, 0, -2, 44, 18, 58, 0}, 0, 86},           /* a warm "ooh" */
      RV_HALL, 70, DT_8T, 50, DS_PULSE, 2},
-    {"CRYSTAL", 0, 0, 52, {{ENGI_FM6, FM6_PAD, DF_AIR, 107}, {ENGI_FM6, FM6_BELL, DF_CRYSTAL_BOWL, 104}, SUB},
-     {FO_CHOIR, {0, 20, 70, 4, 26, 44, 74, 0}, 12, 98},             /* an airy, high "aah" */
+    {"CRYSTAL", 0, 0, 52, {{ENGI_FM6, FM6_PAD, DF_AIR, 107}, {ENGI_FM6, FM6_BELL, DF_CRYSTAL_BOWL, 96}, SUB},
+     {FO_CHOIR, {0, 20, 70, 4, 26, 44, 74, 0}, 12, 94},             /* an airy, high "aah" */
      RV_HALL, 50, DT_2, 56, DS_DRIFT, 1},
 };
 #define DRIFT_NWORLDS (sizeof DRIFT_WORLDS / sizeof DRIFT_WORLDS[0])
@@ -112,9 +109,12 @@ static void drift_glow(track_t *t, int32_t gl)
 {
     int32_t c;
     if (t->eng_req == ENGI_FM6)
-        t->p[P_E0 + 2] = (int16_t)(t == &trk[DRIFT_BELL] ? (gl - 64) / 2 : gl - 64);
+        t->p[P_E0 + 2] = (int16_t)(t == &trk[DRIFT_BELL] ? (gl - 64) / 2 : gl > 112 ? 48 : gl - 64);   /* (the pad's top: no
+                                                                                                    * fizz) */
     else if (t->eng_req == ENGI_ANALOG || t->eng_req == ENGI_NOISE) {   /* (the noise's FREQ is its E2) */
-        c = drift_cut[t - trk] + (gl - 56) * 3 / 4;
+        c = drift_cut[t - trk] + (t->eng_req == ENGI_NOISE ? (gl - 56) / 3 : (gl - 56) * 3 / 4);
+        if (t->eng_req == ENGI_NOISE && c > 80)          /* (noise: brighter, never to a crackle) */
+            c = 80;
         t->p[P_E0 + (t->eng_req == ENGI_NOISE ? 2 : 4)] = (int16_t)(c < 0 ? 0 : c > 127 ? 127 : c);
     }
 }

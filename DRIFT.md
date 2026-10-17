@@ -137,12 +137,12 @@ into a part as its own patch; Felucca's factory sounds stay as they are.
 |---|---|---|---|---|---|---|
 | GLASS | D major | 72 | FM pad | glass bell | airy, high "aah" | DRIFT, HOME |
 | EMBER | A major | 66 | analog strings | electric piano | warm "ooh" | RIPPLE, FLOAT |
-| DUSK | F major | 80 | FM cloud pad | wooden mallets | low, soft hum | PULSE, RISE |
+| DUSK | F major | 80 | FM cloud pad | soft wooden mallets | low, soft hum | PULSE, RISE |
 | NIGHT | E minor | 60 | dark FM pad | glass bell | dark, low whisper | SWELL, LONGING |
 | NEON | G major | 84 | 80s PWM strings | 80s crystal bell | 80s machine voice | PULSE, HOME |
 | LOFI | E♭ major | 70 | soft analog pad | soft lo-fi keys | muffled tape hum | RIPPLE, LONGING |
 | BOWLS | C minor | 56 | warm drone | singing bowl (rings ~20 s) | overtone drone | DRIFT, DRONE |
-| GARDEN | A major | 64 | granular shimmer | kalimba | bright, open "ah" | CHIME, FLOAT |
+| GARDEN | A major | 64 | FM bloom pad | kalimba | bright, open "ah" | CHIME, FLOAT |
 | FOREST | E minor | 58 | FM air pad (breathy) | soft flute | breathy "hoo", like wind | DRIFT, WANDER |
 | OCEAN | D major | 54 | brown-noise waves (swelling over two bars) | clear glass bell, low | low "ooh" | DRIFT, FLOAT |
 | RAIN | E minor | 62 | soft rain drops (noise) | kalimba | hum | RIPPLE, LONGING |
@@ -217,9 +217,13 @@ seconds (two of six random seeds catch it).
 on, the notes heard together sampled continuously; a semitone between two of them (a minor 2nd, a major 7th, a minor
 9th) is a clash. It passes with none. What keeps it so: every melody note sits at least a whole tone from every note of
 the chord (its root too), the flowing line also never steps a semitone from its own last, still ringing note, and a
-minor chord's colour (the upper black keys) is its 7th, not the 9th that rubs against its minor 3rd. Every part of
+minor chord's colour (the upper black keys) is its 7th, not the 9th that rubs against its minor 3rd. The scan also holds
+a black-key chord every 3 s (plain and coloured in turn); what remains (0.1 % of the time on average) is a bell still
+ringing from the chord before as a black key changes it, like a sustain pedal held across the change. Every part of
 every world is in tune within 5 cents (the analog pads' two oscillators 8 cents apart; the granular pads whose pitch
-wanders were replaced by Drift's FM CLOUD and AIR pads).
+wanders were replaced by Drift's FM CLOUD, AIR and BLOOM pads). Every pad, bell, bass and voice is levelled to within
+about 3 dB of its kind in the other worlds, and the bright FM sounds (glass bell, crystal, kalimba, soft wood, the
+pads) soften their overtones above middle C, so nothing fizzes when played high and bright.
 
 Felucca's own suite (`tests/run_tests.sh`) passes with `FELUCCA_DRIFT=0`; with Drift its tests of Felucca's keyboard,
 MIDI-out-of-keys, SONG grid and splash keys fail, as Drift replaces those by design.

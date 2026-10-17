@@ -38,9 +38,9 @@ PATCHES = [
     # A dark pad: round carriers, gentle modulators, a sub-octave underneath.
     ("DARK PAD", voice("DARK PAD", 5, [
         op(r=(34, 28, 40, 34), l=(99, 95, 92, 0), ol=94, det=5),
-        op(r=(30, 28, 40, 34), l=(80, 82, 78, 0), ol=48),
+        op(r=(30, 28, 40, 34), l=(80, 82, 78, 0), ol=48, bp=48, rd=45, rc=0),
         op(r=(34, 28, 40, 34), l=(99, 95, 92, 0), ol=92, det=10),
-        op(r=(30, 28, 40, 34), l=(78, 80, 76, 0), ol=44, fc=2),
+        op(r=(30, 28, 40, 34), l=(78, 80, 76, 0), ol=44, fc=2, bp=48, rd=45, rc=0),
         op(r=(36, 28, 40, 34), l=(99, 95, 92, 0), ol=82, fc=0, det=7),
         op(r=(30, 28, 40, 34), l=(70, 76, 72, 0), ol=36)],
         fb=1, lfs=26, lfd=50, lpmd=4, lfw=0, lpms=2)),
@@ -57,18 +57,28 @@ PATCHES = [
     # sharp.
     ("CLOUD", voice("CLOUD PAD", 5, [
         op(r=(30, 26, 40, 30), l=(99, 95, 92, 0), ol=92, det=4),
-        op(r=(26, 26, 40, 30), l=(80, 84, 80, 0), ol=52, fc=2),
+        op(r=(26, 26, 40, 30), l=(80, 84, 80, 0), ol=52, fc=2, bp=48, rd=45, rc=0),
         op(r=(30, 26, 40, 30), l=(99, 95, 92, 0), ol=90, det=10),
-        op(r=(24, 26, 40, 30), l=(76, 82, 78, 0), ol=46, fc=3),
+        op(r=(24, 26, 40, 30), l=(76, 82, 78, 0), ol=46, fc=3, bp=48, rd=45, rc=0),
         op(r=(32, 26, 40, 30), l=(99, 94, 90, 0), ol=80, fc=2, det=7),
         op(r=(24, 26, 40, 30), l=(70, 78, 74, 0), ol=40, fc=1)],
         fb=2, lfs=24, lfd=40, lpmd=3, lfw=0, lpms=2)),
+    # A bloom pad: bright and shimmering, an octave and a twelfth glinting over soft pairs, a slow light vibrato (in
+    # place of a granular shimmer, whose pitch wanders).
+    ("BLOOM", voice("BLOOM PAD", 5, [
+        op(r=(36, 28, 40, 32), l=(99, 95, 92, 0), ol=92, det=5),
+        op(r=(32, 28, 40, 32), l=(84, 86, 82, 0), ol=56, fc=2, bp=48, rd=45, rc=0),
+        op(r=(36, 28, 40, 32), l=(99, 95, 92, 0), ol=82, fc=2, det=9),
+        op(r=(30, 28, 40, 32), l=(80, 84, 80, 0), ol=50, fc=4, bp=48, rd=40, rc=0),
+        op(r=(40, 28, 40, 32), l=(99, 92, 88, 0), ol=64, fc=3, det=7),
+        op(r=(30, 28, 40, 32), l=(78, 82, 78, 0), ol=44, fc=1)],
+        fb=1, lfs=30, lfd=40, lpmd=5, lfw=0, lpms=2)),
     # An air pad: round sines with a breath of noise (a modulator in feedback) on top, like wind through a reed.
     ("AIR", voice("AIR PAD", 5, [
         op(r=(34, 28, 40, 34), l=(99, 95, 92, 0), ol=94, det=5),
-        op(r=(30, 28, 40, 34), l=(82, 84, 80, 0), ol=40),
+        op(r=(30, 28, 40, 34), l=(82, 84, 80, 0), ol=40, bp=48, rd=45, rc=0),
         op(r=(34, 28, 40, 34), l=(99, 95, 92, 0), ol=86, fc=2, det=9),
-        op(r=(30, 28, 40, 34), l=(80, 82, 78, 0), ol=36, fc=1),
+        op(r=(30, 28, 40, 34), l=(80, 82, 78, 0), ol=36, fc=1, bp=48, rd=45, rc=0),
         op(r=(36, 28, 40, 34), l=(99, 94, 90, 0), ol=62, fc=4),
         op(r=(30, 28, 40, 34), l=(84, 86, 82, 0), ol=58, fc=7, ff=30)],
         fb=7, lfs=22, lfd=50, lpmd=4, lfw=0, lpms=2)),
@@ -81,6 +91,16 @@ PATCHES = [
         op(r=(99, 50, 30, 40), l=(99, 60, 0, 0), ol=70, fc=5, kvs=3, bp=48, rd=60, rc=0),
         op(r=(99, 60, 40, 45), l=(99, 50, 0, 0), ol=78, fc=5, ff=40, det=5),
         op(r=(99, 60, 40, 45), l=(99, 50, 0, 0), ol=60, bp=48, rd=50, rc=0)],
+        fb=0, lpms=0)),
+    # Wooden mallets: Felucca's WOOD BARS (tools/gen_fm6_patches.py), the modulators softened above middle C, so high
+    # notes stay round instead of fizzing.
+    ("SOFT WOOD", voice("SOFT WOOD", 5, [
+        op(r=(99, 52, 40, 55), l=(99, 0, 0, 0), ol=99, kvs=2, rs=2),
+        op(r=(99, 75, 50, 60), l=(99, 0, 0, 0), ol=70, fc=4, kvs=5, rs=3, bp=48, rd=60, rc=0),
+        op(r=(99, 70, 50, 60), l=(99, 0, 0, 0), ol=72, fc=4, kvs=3, rs=3),
+        op(r=(99, 80, 50, 60), l=(99, 0, 0, 0), ol=45, kvs=3, rs=3, bp=48, rd=50, rc=0),
+        op(ol=0),
+        op(ol=0)],
         fb=0, lpms=0)),
     # A kalimba: a plucked metal tine, a quick bright overtone that falls away, a round body that rings on.
     ("KALIMBA", voice("KALIMBA", 5, [
