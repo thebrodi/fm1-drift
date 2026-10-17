@@ -2,8 +2,9 @@
  * Copyright (C) 2026 Dominik Siemon */
 /* DRIFT's checks: the browser build (web/emu/felucca_web.c) compiled natively and played by a restless player.
  *   1. every world x behaviour with every layer on: no clipping, no clicks, no DC, never silent, levels in a band
- *   2. half an hour (simulated) of random playing: PLAY, layers, black-key chords (tapped and held), the seven knobs,
- *      OCT; the output always finite, below clipping, no clicks; every note in range (the bass from E1, the voice
+ *   2. every punch-in in every world: no clipping, no click, no level jump
+ *   3. half an hour (simulated) of random playing: PLAY, layers, black-key chords (tapped and held), the seven knobs,
+ *      OCT, the punch-ins; the output always finite, below clipping, no clicks; every note in range (the bass from E1, the voice
  *      E2..C5, the bells up to C7); never more voices than the 8;
  *      while PLAY and the pad are on, never 3 s of silence; 30..40 s after a stop, the output below -60 dBFS (no
  *      stuck note; an FM6 voice is judged by what it sounds: its own envelopes end it, a bowl's tail runs long)
@@ -95,6 +96,44 @@ static void matrix(void)
     CHECK(db(rms()) < -60.0, "after the matrix and a stop: still %.1f dBFS 30..40 s later", db(rms()));
 }
 
+/* 3: every punch-in in every world, all layers on: held 4 s, then let go: no clipping, no click, and the level within
+ * a few dB of the sound without it (WASH and SHIMMER add, UNDERWATER takes away, none may jump) */
+static const uint8_t PUNCH_BTN[DP_NPUNCH] = {B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO};
+static void punches(void)
+{
+    uint32_t w, k;
+    printf("-- every punch-in in every world (level change while held, dB)\n");
+    for (w = 0; w < DRIFT_NWORLDS; w++) {
+        printf("  %-6s", DRIFT_WORLDS[w].name);
+        drift_load(w);
+        drift_layers = (1u << DL_N) - 1u;
+        if (!drift_run)
+            button(B_PLAY);
+        run(4000);
+        for (k = 0; k < DP_NPUNCH; k++) {
+            double r0, r1;
+            reset();
+            run(3000);
+            r0 = db(rms());
+            reset();
+            web_buttons(1u << PUNCH_BTN[k]);
+            run(4000);
+            r1 = db(rms());
+            CHECK(drift_punch == 1u << k, "%s: %s not shown as held", DRIFT_WORLDS[w].name, DRIFT_PUNCH_NAME[k]);
+            web_buttons(0);
+            run(2000);
+            printf("  %s %+5.1f", DRIFT_PUNCH_NAME[k], r1 - r0);
+            CHECK(pk < 0.8, "%s %s: peak %.3f", DRIFT_WORLDS[w].name, DRIFT_PUNCH_NAME[k], pk);
+            CHECK(jump < 0.35, "%s %s: a sample step of %.3f (a click)", DRIFT_WORLDS[w].name, DRIFT_PUNCH_NAME[k], jump);
+            CHECK(r1 - r0 < 8.0 && r1 - r0 > -24.0, "%s %s: the level jumps %+.1f dB", DRIFT_WORLDS[w].name,
+                  DRIFT_PUNCH_NAME[k], r1 - r0);
+        }
+        printf("\n");
+    }
+    button(B_PLAY);
+    run(3000);
+}
+
 /* 2: random playing */
 static void restless(uint32_t minutes)
 {
@@ -119,8 +158,13 @@ static void restless(uint32_t minutes)
             web_enc(EN_ALGO, rnd(2) ? 1 : -1);
         else if (a < 95)
             web_enc(EN_SELECT, rnd(2) ? 1 : -1);
-        else
+        else if (a < 97)
             button(rnd(2) ? B_OCTUP : B_OCTDN);
+        else {                                           /* a punch-in, held for a while */
+            web_buttons(1u << PUNCH_BTN[rnd(DP_NPUNCH)]);
+            run(300.0 + rnd(3000));
+            web_buttons(0);
+        }
         press(keys);
         keys &= 0x252A52Au;                              /* (white keys: a tap) */
         press(keys);
@@ -167,6 +211,7 @@ int main(int argc, char **argv)
     web_boot();
     run(1000);
     matrix();
+    punches();
     restless(minutes);
     CHECK(bad_note == 0, "%u voice blocks with a note out of range (bass from 28, voice 40..72, bells to 96, all to 108)", bad_note);
     CHECK(too_many == 0, "%u blocks with more than %u voices", too_many, NVOICE);

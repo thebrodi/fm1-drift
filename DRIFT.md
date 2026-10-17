@@ -31,16 +31,17 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 | Control | Does |
 |---|---|
 | **PLAY** | Starts / stops the music |
-| **KNOB 1 — Space** | Reverb, from a small room to a huge hall |
-| **KNOB 2 — Echo** | Delay repeats |
-| **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness) |
-| **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play; chorus and drift) |
+| **KNOB 1 — Space** | Reverb: dry and close → a vast hall |
+| **KNOB 2 — Echo** | Delay: none → long repeating trails |
+| **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness, the analog pads' filter; the bells half as much) |
+| **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play: ×0.2 … ×2.2; chorus and drift) |
 | **White keys** | Toggle the 7 layers, lit while on (the pattern repeats across the keyboard) |
 | **Black keys** | Chords to jump to: press = go there, hold = stay, let go = the progression carries on |
 | **PRESETS** knob | The world: the sounds, the key and the tempo (a few, each complete) |
 | **ALGORITHM** knob | The behaviour: how every layer plays (DRIFT, RIPPLE, SWELL, CHIME, PULSE) |
 | **SELECT** knob | The progression: which chords the music walks through |
 | **OCT− / OCT+** | Everything an octave down / up |
+| **FX SCL ENV LFO EDIT GLO** | Punch-in effects on the whole sound while held (below) |
 | Other buttons | Unused |
 
 ### Layers (white keys, from the left)
@@ -57,6 +58,21 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 
 PAD and MELODY are on at power-on. The FM-1 sounds 8 voices at once across 4 parts, so the layers
 share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), VOX (part 4).
+
+### Punch-in effects (FX SCL ENV LFO EDIT GLO)
+
+Hold a button and its effect plays on the whole sound, in time; let go and it returns, like a DJ in a
+live set (after the Pocket Operator KO-33). The button lights while held and the effect's name glows
+in the middle of the screen. They are Felucca's own performance effects (`perform.c`) on the master.
+
+| Button | Effect |
+|---|---|
+| FX | TAPE STOP: the whole sound warps down |
+| SCL | STUTTER: the last sixteenth repeats |
+| ENV | FREEZE: the moment holds |
+| LFO | SHIMMER: an octave above, beside itself |
+| EDIT | UNDERWATER: a low-pass sweeping down over a bar |
+| GLO | WASH: everything thrown into the reverb |
 
 ### Chords (black keys)
 
@@ -127,19 +143,20 @@ within a few dB of each other in every world.
 
 ## Screen
 
-One page, plain, nothing to navigate:
+One page, nothing to navigate, in one style: soft light. Everything is text and glowing light on deep
+navy: no solid bars, boxes or hard lines.
 
 | Where | Shows |
 |---|---|
-| Top | The three choices: world (PRESETS), progression (SELECT), behaviour (ALGORITHM) |
+| Top | The three choices: world (PRESETS), progression (SELECT), behaviour (ALGORITHM), over a faint glow |
 | Below | The chord now (`vi`, `V add9  HELD`), or PRESS PLAY |
-| Layers | The seven layers, underlined while on |
-| Middle | The sounding notes as soft lights over a slow horizon, each part in its own colour |
-| Knobs | SPACE, ECHO, GLOW, MOTION: name and bar, each in its own colour |
+| Layers | The seven layers, a soft light under each one that is on |
+| Middle | The world's quiet picture, the sounding notes as soft lights; a punch-in's name while held |
+| Knobs | SPACE, ECHO, GLOW, MOTION: a glowing bar with a light at its end, and the value |
 | Bottom | Key, mode and tempo; the octave when shifted |
 
-At power-on a splash shows a soft planet and DRIFT. Colours: deep navy, with pastel sky, lilac,
-rose, mint and peach.
+At power-on a splash shows a soft planet, DRIFT and the version. Colours: deep navy, with pastel
+sky, lilac, rose, mint and peach.
 
 ## Sound
 

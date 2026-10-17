@@ -4,6 +4,7 @@
  * place of Felucca's ui_input / ui_leds / ui_draw; Felucca's UI is still built (main.c's crash, update and UBOOT
  * screens use its drawing) but never runs. One page, no menus: every control does one thing (DRIFT.md).
  *   PLAY       the music on / off
+ *   FX SCL ENV LFO EDIT GLO   punch-in effects while held (drift_play.c)
  *   KNOB 1..4  SPACE (reverb), ECHO (delay), GLOW (brightness), MOTION (how busy; chorus and drift)
  *   PRESETS    the world: the sounds, the key and its mode, the tempo
  *   ALGORITHM  the behaviour of every layer
@@ -91,7 +92,7 @@ static void drift_glow(track_t *t, int32_t gl)
     if (t->eng_req == ENGI_FM6)
         t->p[P_E0 + 2] = (int16_t)(t == &trk[DRIFT_BELL] ? (gl - 64) / 2 : gl - 64);
     else if (t->eng_req == ENGI_ANALOG) {
-        c = drift_cut[t - trk] + (gl - 56) / 2;
+        c = drift_cut[t - trk] + (gl - 56) * 3 / 4;
         t->p[P_E0 + 4] = (int16_t)(c < 0 ? 0 : c > 127 ? 127 : c);
     }
 }
@@ -117,22 +118,22 @@ static void drift_apply(void)
     pad->p[P_LD_AMP] = PAD_BEH[drift_style % DS_N].amp;
     pad->p[P_LTRIG] = 0;
     pad->p[P_ATK] = PAD_BEH[drift_style % DS_N].atk;
-    pad->p[P_REV] = (int16_t)sp;
-    bell->p[P_REV] = (int16_t)(sp + (127 - sp) / 3);
-    choir->p[P_REV] = (int16_t)(sp + (127 - sp) / 2);
+    pad->p[P_REV] = (int16_t)sp;                         /* SPACE: dry and close .. a vast hall */
+    bell->p[P_REV] = (int16_t)sp;
+    choir->p[P_REV] = (int16_t)sp;
     bass->p[P_REV] = (int16_t)(sp / 4);
-    song.g[G_RSIZE] = (int16_t)(60 + sp / 2);
-    pad->p[P_DLY] = (int16_t)(ec / 2);
+    song.g[G_RSIZE] = (int16_t)(16 + sp * 111 / 127);
+    pad->p[P_DLY] = (int16_t)(ec * 3 / 4);               /* ECHO: none .. long trails (feedback up to 100 of 120) */
     bell->p[P_DLY] = (int16_t)ec;
-    choir->p[P_DLY] = (int16_t)(ec / 3);
-    song.g[G_DFDBK] = (int16_t)(30 + ec * 3 / 5);
+    choir->p[P_DLY] = (int16_t)(ec / 2);
+    song.g[G_DFDBK] = (int16_t)(10 + ec * 90 / 127);
     drift_glow(pad, pg < 0 ? 0 : pg > 127 ? 127 : pg);
     drift_glow(bell, gl);
     pad->p[P_CHOR] = (int16_t)mo;
     choir->p[P_CHOR] = (int16_t)(mo / 2);
     if (pad->eng_req == ENGI_FM6)
-        pad->p[P_E0 + 6] = (int16_t)(mo / 2);            /* FM6 DTUN: the operators drift apart */
-    pad->p[P_SPRD] = (int16_t)(40 + mo / 2);
+        pad->p[P_E0 + 6] = (int16_t)(mo * 3 / 4);        /* FM6 DTUN: the operators drift apart */
+    pad->p[P_SPRD] = (int16_t)(20 + mo * 3 / 4);
     drift_motion = (uint8_t)mo;
 }
 
@@ -195,6 +196,7 @@ static void drift_load(uint32_t w)
 }
 
 /* ------------------------------------------------------------- input --- */
+static const uint8_t DRIFT_PUNCH_BTN[DP_NPUNCH] = {B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO};   /* (drift_play.c) */
 static int32_t drift_turn(uint32_t role)                 /* a list knob: one step per turn, whatever its speed */
 {
     int32_t s = panel_enc(role);
@@ -208,6 +210,10 @@ static void drift_input(void)
     fm1_input_note_edges();                              /* (the keys are drift_play.c's) */
     if (!drift_ready) {                                  /* first pass: after the boot and any autosave restore */
         drift_ready = 1;
+        perf_latch_on = 0;                               /* (the punch-ins hold while held, whatever was saved) */
+        perf_mask = 0;
+        for (i = 0; i < DP_NPUNCH; i++)
+            drift_punch_bit[i] = 1u << panel.btn[DRIFT_PUNCH_BTN[i]];
         drift_load(0);
     }
     for (i = 0; i < DK_N; i++)
@@ -271,6 +277,10 @@ static void drift_leds(void)
     led_put(nl, panel.btn[B_OCTUP], drift_oct > 0);
     if (drift_run)
         nl[LED_PLAY_GREEN >> 3] |= (uint8_t)(1u << (LED_PLAY_GREEN & 7u));
+    for (k = 0; k < DP_NPUNCH; k++) {                    /* the punch-in buttons: lit while held, dim otherwise */
+        led_put(nl, panel.btn[DRIFT_PUNCH_BTN[k]], (drift_punch >> k) & 1u);
+        led_put(nd, panel.btn[DRIFT_PUNCH_BTN[k]], 1);
+    }
     fm1_led_dim_level(1);
     for (c = 0; c < FM1_NCOL; c++) {
         fm1_led_dim[c] = (uint8_t)(nd[c] & ~nl[c]);
@@ -299,7 +309,6 @@ static void drift_leds(void)
 #define D_MINT RGB(159, 225, 203)
 #define D_PEACH RGB(245, 196, 179)
 #define D_VIOLET RGB(127, 119, 221)
-#define D_GRID RGB(82, 72, 140)
 #define VIZ_Y 84u
 #define VIZ_H 88u
 
@@ -346,6 +355,31 @@ static void d_glow(int32_t cx, int32_t cy, int32_t r, uint16_t c, uint32_t a)
 static uint32_t viz_ph;                  /* one step a drawn frame (~30 a second) */
 static int32_t v_sin(uint32_t a, int32_t amp) { return SINE[a & 1023u] * amp / 32768; }
 
+/* a soft line across, from x0 to x1 at row y: a / 32 on the row, fading over the two rows each side */
+static void d_hglow(int32_t x0, int32_t x1, int32_t y, uint16_t c, uint32_t a)
+{
+    int32_t x;
+    for (x = x0; x < x1; x++) {
+        d_add(x, y, c, a);
+        d_add(x, y - 1, c, a / 2u);
+        d_add(x, y + 1, c, a / 2u);
+        d_add(x, y - 2, c, a / 6u);
+        d_add(x, y + 2, c, a / 6u);
+    }
+}
+
+/* a soft dotted line between two points (every 3 px a faint light) */
+static void d_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c, uint32_t a)
+{
+    int32_t dx = x1 - x0, dy = y1 - y0, n = (dx < 0 ? -dx : dx) > (dy < 0 ? -dy : dy) ? (dx < 0 ? -dx : dx) : (dy < 0 ? -dy : dy), k;
+    for (k = 0; k <= n; k += 3) {
+        int32_t x = n ? x0 + dx * k / n : x0, y = n ? y0 + dy * k / n : y0;
+        d_add(x, y, c, a);
+        d_add(x + 1, y, c, a / 3u);
+        d_add(x, y + 1, c, a / 3u);
+    }
+}
+
 static void viz_ring(int32_t cx, int32_t cy, int32_t rx, int32_t ry, uint16_t c, uint32_t a)   /* a dotted ellipse */
 {
     uint32_t k, n = rx < 8 ? 16u : 48u;
@@ -372,13 +406,13 @@ static void viz_back(void)
         }
         break;
     case 4:                                              /* NEON: a horizon and a grid running toward it */
-        cv_rect(0, m + 6, w, 1, D_ROSE);
+        d_hglow(0, w, m + 6, D_ROSE, 14);
         for (x = -6; x <= 6; x++)
-            cv_line(w / 2 + x * 8, m + 6, w / 2 + x * 44, h, D_GRID);
+            d_line(w / 2 + x * 8, m + 8, w / 2 + x * 44, h, D_LILAC, 6);
         for (i = 0; i < 4u; i++) {
             y = m + 6 + (int32_t)(((viz_ph / 2u + i * 16u) % 64u) * ((viz_ph / 2u + i * 16u) % 64u) / 120u);
             if (y < h)
-                cv_rect(0, y, w, 1, D_GRID);
+                d_hglow(0, w, y, D_LILAC, 4);
         }
         break;
     case 5:                                              /* LOFI: slow soft rain */
@@ -386,7 +420,7 @@ static void viz_back(void)
             r = r * 1664525u + 1013904223u;
             x = (int32_t)(r >> 8) % w;
             y = (int32_t)(((r >> 20) + viz_ph * (2u + (r >> 30))) % (uint32_t)(h + 10)) - 10;
-            cv_line(x, y, x - 1, y + 6, D_DIM);
+            d_line(x, y, x - 1, y + 7, D_LILAC, 5);
         }
         break;
     case 6:                                              /* BOWLS: still rings around the centre */
@@ -402,7 +436,7 @@ static void viz_back(void)
     default:                                             /* GARDEN: nothing but the fireflies */
         if (drift_world == 2u)
             for (x = 0; x < w; x += 3)
-                cv_pset(x, m + v_sin((uint32_t)x * 6u + viz_ph * 2u, 6), D_DIM);
+                d_add(x, m + v_sin((uint32_t)x * 6u + viz_ph * 2u, 6), D_LILAC, 7);
         break;
     }
 }
@@ -473,6 +507,13 @@ static void drift_viz(void)
             if (viz_place(p, i, v->note, lvl, &x, &y, &rad))
                 d_glow(x, y, rad, DRIFT_PCOL[p], (uint32_t)(10 + lvl / 2));
         }
+    for (p = 0; p < DP_NPUNCH; p++)                      /* a punch-in held: its name, softly lit, in the middle */
+        if ((drift_punch >> p) & 1u) {
+            int32_t tw = text_w(&AF_M, DRIFT_PUNCH_NAME[p]);
+            d_hglow(120 - tw / 2 - 10, 120 + tw / 2 + 10, (int32_t)VIZ_H / 2, D_LILAC, 8);
+            cv_text(120 - tw / 2, (int32_t)VIZ_H / 2 - 9, &AF_M, DRIFT_PUNCH_NAME[p], D_TEXT);
+            break;
+        }
     cv_blit(0, VIZ_Y);
 }
 
@@ -486,7 +527,7 @@ static void drift_draw_head(void)
     cv_text(8, 4, &AF_S, w->name, D_TEXT);
     cv_text(120 - text_w(&AF_S, DRIFT_PROG[drift_prog % DP_N]) / 2, 4, &AF_S, DRIFT_PROG[drift_prog % DP_N], D_TEXT);
     cv_text_r(232, 4, &AF_S, DRIFT_STYLE[drift_style % DS_N], D_TEXT, D_BG);
-    cv_rect(8, 22, 224, 1, D_DIM);
+    d_hglow(8, 232, 22, D_LILAC, 3);
     cv_blit(0, 4);
     for (s = DRIFT_KEYNAME[w->root % 12u]; *s; s++)     /* key and tempo, octave */
         b[n++] = *s;
@@ -520,25 +561,34 @@ static void drift_draw_chord(void)
         b[n] = 0;
         draw_text_line(0, 34, 240, &AF_M, b, D_TEXT, D_BG, 1);
     }
-    cv_begin(240, 20, D_BG);                             /* the layers, underlined while on */
+    cv_begin(240, 24, D_BG);                             /* the layers, a soft light under each that is on */
     for (i = 0; i < DL_N; i++) {
         uint32_t on = (drift_layers >> i) & 1u, x = 2u + i * 34u;
         cv_text((int32_t)(x + 17u) - text_w(&AF_S, DRIFT_LAYER[i]) / 2, 0, &AF_S, DRIFT_LAYER[i],
                 on ? D_TEXT : D_DIM);
         if (on)
-            cv_rect((int32_t)x + 7, 17, 20, 2, D_PEACH);
+            d_glow((int32_t)x + 17, 19, 5, D_PEACH, 22);
     }
     cv_blit(0, 60);
 }
 
+/* a knob: its name, a soft glowing bar with a light at its end, its value */
 static void drift_draw_bar(uint32_t i)
 {
-    uint32_t x = 6u + i * 58u, w = 54u, f = (uint32_t)drift_knob[i] * w / 127u;
-    cv_begin(w, 34, D_BG);
-    cv_text((int32_t)w / 2 - text_w(&AF_S, DRIFT_KNOB[i]) / 2, 0, &AF_S, DRIFT_KNOB[i], D_MID);
-    cv_rect(0, 22, (int32_t)w, 6, D_DIM);
-    cv_rect(0, 22, (int32_t)f, 6, DRIFT_KCOL[i]);
-    cv_blit(x, 182);
+    int32_t w = 56, f = drift_knob[i] * (w - 8) / 127 + 4;
+    char b[4];
+    uint32_t v = (uint32_t)drift_knob[i] * 100u / 127u;
+    cv_begin((uint32_t)w, 46, D_BG);
+    cv_text(w / 2 - text_w(&AF_S, DRIFT_KNOB[i]) / 2, 0, &AF_S, DRIFT_KNOB[i], D_MID);
+    d_hglow(4, w - 4, 23, DRIFT_KCOL[i], 3);             /* the track, faint */
+    d_hglow(4, f, 23, DRIFT_KCOL[i], 18);                /* the value, lit */
+    d_glow(f, 23, 6, DRIFT_KCOL[i], 22);                 /* .. and a light where it ends */
+    b[0] = (char)(v >= 100u ? '1' : '0' + v / 10u);
+    b[1] = (char)(v >= 100u ? '0' : '0' + v % 10u);
+    b[2] = v >= 100u ? '0' : 0;
+    b[3] = 0;
+    cv_text(w / 2 - text_w(&AF_S, v < 10u ? b + 1 : b) / 2, 31, &AF_S, v < 10u ? b + 1 : b, DRIFT_KCOL[i]);
+    cv_blit(6u + i * 58u, 174);
 }
 
 /* the splash (main.c, in place of Felucca's): a soft planet, DRIFT, a line */

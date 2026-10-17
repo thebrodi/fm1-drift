@@ -35,6 +35,7 @@ If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelto
 | **ALGORITHM** | The behaviour: DRIFT, RIPPLE, SWELL, CHIME, PULSE |
 | **SELECT** | The progression: DRONE, HOME, FLOAT, LONGING, RISE, WANDER |
 | **OCT− / OCT+** | Everything an octave down / up |
+| **FX SCL ENV LFO EDIT GLO** | Punch-in effects while held: tape stop, stutter, freeze, shimmer, underwater, wash |
 
 The worlds range from glassy bells and warm electric piano to a dark minor pad, 80s strings, lo-fi keys, a singing
 bowl over a drone, a kalimba and a soft flute. The full design and its rules are in [DRIFT.md](DRIFT.md).

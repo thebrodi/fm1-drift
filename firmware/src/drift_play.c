@@ -7,6 +7,9 @@
  *   Black keys: chords to jump to (vi ii IV V I from the left; the upper ones the same chords, add9): pressed, the music
  *   moves there; held, it stays; let go, the progression carries on from there.
  *   ALGORITHM: how every layer behaves (DS_*: how long a chord lasts, how often each layer plays).
+ *   FX SCL ENV LFO EDIT GLO: punch-in effects on the whole sound while held (Felucca's perform.c effects, on the master):
+ *   TAPE STOP, STUTTER (REPEAT 1/16), FREEZE, SHIMMER (OCT UP), UNDERWATER (the LPF sweeping down over a bar), WASH
+ *   (REV THROW).
  * Every note comes from the scale of the world (major or natural minor, from drift_root) and mostly from the chord
  * sounding now: nothing can clash.
  * Parts: PAD and SHIMMER on part 1, ARP SPARKLE MELODY on part 2 (struck bells), BASS on 3, CHOIR on 4. The FM-1
@@ -23,6 +26,12 @@ static const int8_t DRIFT_BLACK[2][5] = {{5, 1, 3, 4, 0}, {5, 3, 4, 6, 0}};
 static const int8_t DRIFT_WANDER[2][5] = {{0, 1, 3, 4, 5}, {0, 2, 3, 5, 6}};   /* the chords WANDER visits */
 enum { DS_DRIFT, DS_RIPPLE, DS_SWELL, DS_CHIME, DS_PULSE, DS_N };
 static const char *const DRIFT_STYLE[DS_N] = {"DRIFT", "RIPPLE", "SWELL", "CHIME", "PULSE"};
+/* the punch-in effects of the six buttons (perform.c PF_*), and their names on the screen */
+#define DP_NPUNCH 6u
+static volatile uint32_t drift_punch_bit[DP_NPUNCH];   /* the buttons' bits in fm1_in.buttons (drift_ui.c sets them:
+                                                         * FX SCL ENV LFO EDIT GLO; panel.c comes after this file) */
+static const uint8_t DRIFT_PUNCH[DP_NPUNCH] = {PF_TAPE, PF_R16, PF_FRZ, PF_OUP, PF_LPF, PF_RTHR};
+static const char *const DRIFT_PUNCH_NAME[DP_NPUNCH] = {"TAPE STOP", "STUTTER", "FREEZE", "SHIMMER", "UNDERWATER", "WASH"};
 static const uint8_t DRIFT_SCALE[2][7] = {{0, 2, 4, 5, 7, 9, 11}, {0, 2, 3, 5, 7, 8, 10}};   /* major, natural minor */
 
 /* ------------------------------------------------------- progressions --- */
@@ -79,6 +88,7 @@ static volatile uint8_t drift_pin = 0xFF;   /* the black key (its place) holding
 static volatile uint8_t drift_act[DL_N]; /* each layer's activity: 255 as it plays a note, the screen lets it fade */
 static volatile int8_t drift_deg = -1;   /* the chord sounding (0..6), -1 none: the screen shows it */
 static volatile uint8_t drift_seen;      /* bumped when the chord or a toggle changes (the screen redraws) */
+static volatile uint8_t drift_punch;     /* the punch-in effects held (bit per button of DRIFT_PUNCH_BTN) */
 
 /* ------------------------------------------------------------- notes --- */
 static int32_t drift_step(int32_t s)     /* a scale step of the key: semitones above drift_root (negative too) */
@@ -102,10 +112,10 @@ static uint32_t drift_rand(uint32_t n)   /* 0 .. n - 1 */
     drift_rng ^= drift_rng << 5;
     return n ? drift_rng % n : 0u;
 }
-/* 1 with chance p / 128, more often when MOTION is high (x0.4 .. x1.9) */
+/* 1 with chance p / 128, more often when MOTION is high (x0.2 .. x2.2) */
 static int drift_chance(uint32_t p, uint32_t scale)
 {
-    return drift_rand(scale) < p * (51u + drift_motion * 3u / 2u) / 128u;
+    return drift_rand(scale) < p * (24u + drift_motion * 2u) / 128u;
 }
 
 /* a held voice of one part: the notes it sounds now -> want (n of them): only what changes moves */
@@ -505,6 +515,19 @@ static void drift_block(uint32_t n)
     }
     drift_bells_block(n);
     drift_keys_block();
+    {   /* the punch-in buttons: each holds its effect while it is down */
+        uint32_t i, b, down = 0;
+        for (i = 0; i < DP_NPUNCH; i++)
+            if (fm1_in.buttons & drift_punch_bit[i])
+                down |= 1u << i;
+        for (i = 0; i < DP_NPUNCH; i++)
+            if ((b = 1u << i) & (down ^ drift_punch))
+                perf_press(DRIFT_PUNCH[i], (down & b) != 0u);
+        if (down != drift_punch) {
+            drift_punch = (uint8_t)down;
+            drift_seen++;
+        }
+    }
     if (oct != drift_oct) {                              /* the register moved: the held notes */
         oct = drift_oct;
         drift_voice_held();
