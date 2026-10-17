@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
-/* DRIFT, heard without a browser: the browser build (felucca_web.c) compiled natively, pressing PLAY, adding the layers
- * one by one, then each behaviour, a progression and the black-key chords (it prints when each starts), written as a 16-bit
- * stereo WAV, with its peak and RMS printed.
+/* DRIFT, heard without a browser: the browser build (felucca_web.c) compiled natively, pressing PLAY with pad, bass, melody
+ * and voice, then every behaviour, every progression, every world and the black-key chords (it prints when each
+ * starts), written as a 16-bit stereo WAV, with its peak and RMS printed.
  *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -o build/drift_render web/emu/drift_render.c -lm
  *   build/drift_render OUT.wav */
 #include "felucca_web.c"
@@ -70,30 +70,36 @@ int main(int argc, char **argv)
     render(600);                                   /* the splash */
     frames = 0;
     sum2 = peak = 0;
-    mark("PLAY: PAD + MELODY, GLASS, HOME, DRIFT");
+    mark("PLAY in GLASS; + BASS, + VOX (pad, bass, melody, voice on from here)");
     play();
-    render(14000);
-    for (i = 1; i < 7u; i++) {                     /* the other layers, one by one */
-        static const char *const N[7] = {"", "+ BASS", "+ ARP", "+ SPARKLE", "- MELODY", "+ CHOIR", "+ SHIMMER"};
-        mark(N[i]);
-        tap(WHITE[i == 4u ? 4u : i]);
-        render(7000);
-    }
-    for (i = 1; i < DS_N; i++) {                   /* every behaviour */
+    tap(WHITE[DL_BASS]);
+    tap(WHITE[DL_CHOIR]);
+    render(8000);
+    for (i = 1; i < DS_N; i++) {                   /* every behaviour, as ALGORITHM turns */
         drift_style = (uint8_t)i;
+        drift_apply();
         mark(DRIFT_STYLE[i]);
-        render(10000);
+        render(12000);
     }
     drift_style = DS_RIPPLE;
-    drift_prog = 3;
-    mark("RIPPLE, LONGING; then V held 6 s on a black key, then vi add9 tapped");
-    render(8000);
+    drift_apply();
+    for (i = 0; i < DP_N; i++) {                   /* every progression, as SELECT turns (RIPPLE) */
+        drift_prog = (uint8_t)i;
+        mark(DRIFT_PROG[i]);
+        render(12000);
+    }
+    for (i = 1; i < DRIFT_NWORLDS; i++) {          /* every world, as PRESETS turns: its own sounds, voice, behaviour */
+        drift_load(i);
+        mark(DRIFT_WORLDS[i].name);
+        render(14000);
+    }
+    mark("V held 6 s on a black key, then vi add9 tapped");
     web_keys(1u << BLACK[3]);
     render(6000);
     web_keys(0);
     render(3000);
     tap(BLACK[5]);
-    render(9000);
+    render(6000);
     mark("stop");
     play();
     render(5000);                                  /* the tails */

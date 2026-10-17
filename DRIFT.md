@@ -74,18 +74,29 @@ sounding now is lit, so you can see where you are.
 
 ### Behaviours (ALGORITHM)
 
-| Behaviour | Feel |
-|---|---|
-| DRIFT | Sparse and floating; chords change every 4 bars |
-| RIPPLE | Flowing eighth-note arpeggios; every 2 bars |
-| SWELL | Slow and wide, few notes; every 4 bars |
-| CHIME | Quick sixteenth figures and bursts of sparkle; every 2 bars |
-| PULSE | A soft steady beat, the bass on the quarters; every bar |
+A behaviour is the character of the whole piece: its pace, how the pad breathes, how the melody
+moves and how often the other layers play. Each world starts in its own; ALGORITHM turns from there.
+
+| Behaviour | Pace | Pad | Melody |
+|---|---|---|---|
+| DRIFT | half time | a slow sway over two bars, softer | single notes far apart, now and then an octave up |
+| RIPPLE | normal | a gentle half-bar movement | a flowing line, a step of the scale each eighth |
+| SWELL | half time | breathing in and out every bar | very rare notes |
+| CHIME | normal | still, quicker and brighter | quick figures of three high notes, then a rest |
+| PULSE | normal | a soft pulse on every beat | a four-note motif on the beats, new with each chord; the bass on the quarters |
 
 ### Progressions (SELECT)
 
-DRONE (one chord), HOME (I vi IV V), FLOAT (I IV), LONGING (vi IV I V), RISE (IV V iii vi),
-WANDER (moves at random between chords that fit).
+Turning SELECT starts the new progression on the next beat. Each has its own shape and pace:
+
+| Progression | Chords | Each chord lasts |
+|---|---|---|
+| DRONE | I | forever |
+| HOME | I vi IV V | 2 bars |
+| FLOAT | I IV (rocking) | 2 bars |
+| LONGING | vi iii IV I | 4 bars |
+| RISE | I iii IV V vi (climbing) | 1 bar |
+| WANDER | anywhere that fits, at random | 1 bar |
 
 In a minor world the same progressions turn minor (HOME: i VI iv v), and the black keys play
 VI iv v VII i (no diminished chords, so nothing sounds harsh).
@@ -96,19 +107,21 @@ A world is a whole mood: the key and its mode, the tempo, and the sound of each 
 patches (`tools/gen_drift_patches.py`: bowl, drone, dark pad, crystal, kalimba, soft keys) are loaded
 into a part as its own patch; Felucca's factory sounds stay as they are.
 
-| World | Key | BPM | Pad | Bells (ARP, SPARKLE, MELODY) | VOX |
-|---|---|---|---|---|---|
-| GLASS | D major | 72 | FM pad | glass bell | choir |
-| EMBER | A major | 66 | FM pad | electric piano | choir |
-| DUSK | F major | 80 | FM pad | wooden mallets | choir |
-| NIGHT | E minor | 60 | dark FM pad | glass bell | whisper |
-| NEON | G major | 84 | 80s PWM strings | 80s crystal bell | choir |
-| LOFI | E♭ major | 70 | soft analog pad | soft lo-fi keys | whisper |
-| BOWLS | C minor | 56 | warm drone | singing bowl (rings ~20 s) | choir |
-| GARDEN | A major | 64 | warm drone | kalimba | choir |
-| FOREST | E minor | 58 | FM pad | soft flute | whisper |
+| World | Key | BPM | Pad | Bells (ARP, SPARKLE, MELODY) | VOX | Starts in |
+|---|---|---|---|---|---|---|
+| GLASS | D major | 72 | FM pad | glass bell | airy, high "aah" | DRIFT, HOME |
+| EMBER | A major | 66 | analog strings | electric piano | warm "ooh" | RIPPLE, FLOAT |
+| DUSK | F major | 80 | granular cloud | wooden mallets | low, soft hum | PULSE, RISE |
+| NIGHT | E minor | 60 | dark FM pad | glass bell | dark, low whisper | SWELL, LONGING |
+| NEON | G major | 84 | 80s PWM strings | 80s crystal bell | 80s machine voice | PULSE, HOME |
+| LOFI | E♭ major | 70 | soft analog pad | soft lo-fi keys | muffled tape hum | RIPPLE, LONGING |
+| BOWLS | C minor | 56 | warm drone | singing bowl (rings ~20 s) | overtone drone | DRIFT, DRONE |
+| GARDEN | A major | 64 | granular shimmer | kalimba | bright, open "ah" | CHIME, FLOAT |
+| FOREST | E minor | 58 | granular, frozen | soft flute | breathy "hoo", like wind | DRIFT, WANDER |
 
-Every world uses the same sub bass. Levels are measured so the pad, the bells and the voice sit
+Each world also has its own room: reverb type and damping, delay time and colour. NEON has a square
+bass; the others a sub bass. The VOX is the voice engine with the world's own vowel, its glide to a
+second vowel, formant shift, buzz, breath and resonance. Levels are measured so the pad, the bells and the voice sit
 within a few dB of each other in every world.
 
 ## Screen
