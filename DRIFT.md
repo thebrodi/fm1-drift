@@ -130,13 +130,13 @@ into a part as its own patch; Felucca's factory sounds stay as they are.
 |---|---|---|---|---|---|---|
 | GLASS | D major | 72 | FM pad | glass bell | airy, high "aah" | DRIFT, HOME |
 | EMBER | A major | 66 | analog strings | electric piano | warm "ooh" | RIPPLE, FLOAT |
-| DUSK | F major | 80 | granular cloud | wooden mallets | low, soft hum | PULSE, RISE |
+| DUSK | F major | 80 | FM cloud pad | wooden mallets | low, soft hum | PULSE, RISE |
 | NIGHT | E minor | 60 | dark FM pad | glass bell | dark, low whisper | SWELL, LONGING |
 | NEON | G major | 84 | 80s PWM strings | 80s crystal bell | 80s machine voice | PULSE, HOME |
 | LOFI | E♭ major | 70 | soft analog pad | soft lo-fi keys | muffled tape hum | RIPPLE, LONGING |
 | BOWLS | C minor | 56 | warm drone | singing bowl (rings ~20 s) | overtone drone | DRIFT, DRONE |
 | GARDEN | A major | 64 | granular shimmer | kalimba | bright, open "ah" | CHIME, FLOAT |
-| FOREST | E minor | 58 | granular, frozen | soft flute | breathy "hoo", like wind | DRIFT, WANDER |
+| FOREST | E minor | 58 | FM air pad (breathy) | soft flute | breathy "hoo", like wind | DRIFT, WANDER |
 
 Each world also has its own room: reverb type and damping, delay time and colour. NEON has a square
 bass; the others a sub bass. The VOX is the voice engine with the world's own vowel, its glide to a
@@ -196,6 +196,14 @@ level band), then random playing for MINUTES (default 30): output finite and bel
 more than 8 voices, never silent while the pad plays, silent 30–40 s after a stop. The build command is at the top of
 the file. Known rough edge: with GLOW at its maximum, OCT+ and a high ECHO, a bright chord of bells can fizz for a few
 seconds (two of six random seeds catch it).
+
+`tests/drift_harmony.c` checks that everything harmonises: every world × behaviour × progression with every layer
+on, the notes heard together sampled continuously; a semitone between two of them (a minor 2nd, a major 7th, a minor
+9th) is a clash. It passes with none. What keeps it so: every melody note sits at least a whole tone from every note of
+the chord (its root too), the flowing line also never steps a semitone from its own last, still ringing note, and a
+minor chord's colour (the upper black keys) is its 7th, not the 9th that rubs against its minor 3rd. Every part of
+every world is in tune within 5 cents (the analog pads' two oscillators 8 cents apart; the granular pads whose pitch
+wanders were replaced by Drift's FM CLOUD and AIR pads).
 
 Felucca's own suite (`tests/run_tests.sh`) passes with `FELUCCA_DRIFT=0`; with Drift its tests of Felucca's keyboard,
 MIDI-out-of-keys, SONG grid and splash keys fail, as Drift replaces those by design.

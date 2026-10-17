@@ -16,7 +16,8 @@
 /* A world (PRESETS) is a whole mood: the key and its mode, the tempo, and the sound of each of the four parts. A part
  * is an engine and one of its presets, then (FM6) one of DRIFT's own patches put in over it (tools/gen_drift_patches.py:
  * loaded as the part's own patch, Felucca's factory patches untouched), at a level that sits it in the mix. */
-#include "drift_fm6.h"                   /* DRIFT_FM6[]: BOWL, DRONE, DARK PAD, CRYSTAL, CLEAR BELL, KALIMBA, SOFT KEYS */
+#include "drift_fm6.h"                   /* DRIFT_FM6[]: BOWL, DRONE, DARK PAD, CRYSTAL, CLOUD, AIR, CLEAR BELL, KALIMBA,
+                                          * SOFT KEYS */
 #define ENGI_ANALOG 0u                   /* engines.c ENGINES[] */
 #define ENGI_FORMANT 5u
 #define ENGI_WHEEL 7u
@@ -25,7 +26,7 @@ enum { FM6_TINE = 0, FM6_BELL = 1, FM6_PAD = 4, FM6_MARIMBA = 5 };   /* eng_fm6.
 enum { AN_SOFT_PAD = 1, AN_SQR_BASS = 2, AN_PWM_STR = 3, AN_SUB_BASS = 7, AN_STRINGS = 11 };   /* eng_analog.c's */
 enum { FO_CHOIR = 0, FO_LEAD = 1, FO_WHISPER = 3 };                                        /* eng_formant.c's */
 enum { WH_SOFT_FLUTE = 3 };                                                   /* eng_wheel.c's */
-enum { GR_CLOUD = 0, GR_FROZEN = 2, GR_SHIMMER = 3 };                         /* eng_grain.c's */
+enum { GR_SHIMMER = 3 };                                                      /* eng_grain.c's */
 enum { RV_ROOM, RV_SPRING, RV_HALL };                                         /* G_RTYPE */
 enum { DT_4 = 0, DT_8 = 1, DT_8T = 4, DT_2 = 6, DT_1 = 7, DT_8D = 10, DT_4D = 12 };   /* G_DTIME (params.c N_DTIME) */
 #define NO_PATCH 0xFFu
@@ -47,10 +48,10 @@ static const drift_world_t DRIFT_WORLDS[] = {
     {"GLASS", 2, 0, 72, {{ENGI_FM6, FM6_PAD, NO_PATCH, 102}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
      {FO_CHOIR, {0, 20, 70, 3, 30, 40, 72, 0}, 12, 82},             /* airy, high: "aah" opening to "eh" */
      RV_HALL, 60, DT_4, 64, DS_DRIFT, 1},
-    {"EMBER", 9, 0, 66, {{ENGI_ANALOG, AN_STRINGS, NO_PATCH, 88}, {ENGI_FM6, FM6_TINE, NO_PATCH, 108}, SUB},
+    {"EMBER", 9, 0, 66, {{ENGI_ANALOG, AN_STRINGS, NO_PATCH, 94}, {ENGI_FM6, FM6_TINE, NO_PATCH, 108}, SUB},
      {FO_CHOIR, {100, 95, 0, -3, 46, 16, 60, 0}, 0, 86},            /* warm "ooh" */
      RV_SPRING, 80, DT_8T, 40, DS_RIPPLE, 2},
-    {"DUSK", 5, 0, 80, {{ENGI_GRAIN, GR_CLOUD, NO_PATCH, 96}, {ENGI_FM6, FM6_MARIMBA, NO_PATCH, 127}, SUB},
+    {"DUSK", 5, 0, 80, {{ENGI_FM6, FM6_PAD, DF_CLOUD, 110}, {ENGI_FM6, FM6_MARIMBA, NO_PATCH, 127}, SUB},
      {FO_CHOIR, {127, 127, 0, -5, 18, 28, 38, 0}, -12, 93},         /* a low, soft hum */
      RV_ROOM, 70, DT_8D, 50, DS_PULSE, 4},
     {"NIGHT", 4, 1, 60, {{ENGI_FM6, FM6_PAD, DF_DARK_PAD, 102}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
@@ -69,7 +70,7 @@ static const drift_world_t DRIFT_WORLDS[] = {
     {"GARDEN", 9, 0, 64, {{ENGI_GRAIN, GR_SHIMMER, NO_PATCH, 106}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 112}, SUB},
      {FO_CHOIR, {10, 40, 50, 2, 56, 14, 70, 40}, 0, 90},            /* a bright, open "ah", its vowel wandering */
      RV_SPRING, 60, DT_8T, 60, DS_CHIME, 2},
-    {"FOREST", 4, 1, 58, {{ENGI_GRAIN, GR_FROZEN, NO_PATCH, 96}, {ENGI_WHEEL, WH_SOFT_FLUTE, NO_PATCH, 122}, SUB},
+    {"FOREST", 4, 1, 58, {{ENGI_FM6, FM6_PAD, DF_AIR, 104}, {ENGI_WHEEL, WH_SOFT_FLUTE, NO_PATCH, 122}, SUB},
      {FO_WHISPER, {120, 100, 90, 0, 24, 92, 54, 0}, 0, 94},        /* a breathy "hoo", like wind */
      RV_HALL, 76, DT_4D, 44, DS_DRIFT, 5},
 };
@@ -165,6 +166,8 @@ static void drift_load(uint32_t w)
     const drift_world_t *d = &DRIFT_WORLDS[w % DRIFT_NWORLDS];
     drift_world = (uint8_t)(w % DRIFT_NWORLDS);
     drift_part(&trk[DRIFT_PAD], &d->part[0], 72, 112, 104);     /* slow swell in, long tail out */
+    if (trk[DRIFT_PAD].eng_req == ENGI_ANALOG)           /* its two oscillators 8 cents apart: a chorus, still in tune */
+        trk[DRIFT_PAD].p[P_E0 + 1] = 8;
     trk[DRIFT_PAD].p[P_DEC] = 90;
     drift_part(&trk[DRIFT_BELL], &d->part[1], 0, 127, 100);     /* struck: its own decay, a long release */
     trk[DRIFT_BELL].p[P_PAN] = 20;

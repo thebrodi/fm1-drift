@@ -53,6 +53,25 @@ PATCHES = [
         op(r=(99, 32, 22, 38), l=(99, 80, 0, 0), ol=78, fc=2, det=7),
         op(r=(99, 50, 30, 45), l=(99, 50, 0, 0), ol=58, fc=1)],
         fb=2, lfs=34, lfd=30, lpmd=3, lfw=0, lpms=2)),
+    # A cloud pad: soft pairs a few cents apart, gentle second and third harmonics, slow in, slow out: hazy, never
+    # sharp.
+    ("CLOUD", voice("CLOUD PAD", 5, [
+        op(r=(30, 26, 40, 30), l=(99, 95, 92, 0), ol=92, det=4),
+        op(r=(26, 26, 40, 30), l=(80, 84, 80, 0), ol=52, fc=2),
+        op(r=(30, 26, 40, 30), l=(99, 95, 92, 0), ol=90, det=10),
+        op(r=(24, 26, 40, 30), l=(76, 82, 78, 0), ol=46, fc=3),
+        op(r=(32, 26, 40, 30), l=(99, 94, 90, 0), ol=80, fc=2, det=7),
+        op(r=(24, 26, 40, 30), l=(70, 78, 74, 0), ol=40, fc=1)],
+        fb=2, lfs=24, lfd=40, lpmd=3, lfw=0, lpms=2)),
+    # An air pad: round sines with a breath of noise (a modulator in feedback) on top, like wind through a reed.
+    ("AIR", voice("AIR PAD", 5, [
+        op(r=(34, 28, 40, 34), l=(99, 95, 92, 0), ol=94, det=5),
+        op(r=(30, 28, 40, 34), l=(82, 84, 80, 0), ol=40),
+        op(r=(34, 28, 40, 34), l=(99, 95, 92, 0), ol=86, fc=2, det=9),
+        op(r=(30, 28, 40, 34), l=(80, 82, 78, 0), ol=36, fc=1),
+        op(r=(36, 28, 40, 34), l=(99, 94, 90, 0), ol=62, fc=4),
+        op(r=(30, 28, 40, 34), l=(84, 86, 82, 0), ol=58, fc=7, ff=30)],
+        fb=7, lfs=22, lfd=50, lpmd=4, lfw=0, lpms=2)),
     # A clear glass bell: Felucca's GLASS BELL (tools/gen_fm6_patches.py), its modulators softened above middle C, so
     # high notes stay clear instead of fizzing.
     ("CLEAR BELL", voice("CLEAR BELL", 5, [

@@ -219,7 +219,26 @@ static uint32_t drift_tones(int32_t *st)
     st[0] = drift_bright ? 2 : 0;
     st[1] = drift_bright ? 4 : 2;
     st[2] = drift_bright ? 8 : 4;
+    if (drift_bright && drift_step(drift_cur + 2) - drift_step(drift_cur) == 3)
+        st[2] = 6;                                       /* a minor chord: its 7th, not the 9th (a semitone off its 3rd) */
     return 3;
+}
+
+/* 1 = note n sits at least a whole tone from every tone of the chord now (its root, for the bass, too): no semitone
+ * rubs against what holds */
+static int drift_fits(int32_t n)
+{
+    int32_t st[3], t[4], i;
+    drift_tones(st);
+    t[0] = drift_root + drift_step(drift_cur);
+    for (i = 0; i < 3; i++)
+        t[i + 1] = drift_root + drift_step(drift_cur + st[i]);
+    for (i = 0; i < 4; i++) {
+        int32_t d = ((n - t[i]) % 12 + 12) % 12;
+        if (d == 1 || d == 11)
+            return 0;
+    }
+    return 1;
 }
 static uint32_t drift_note(int32_t steps_above, int32_t lo)   /* a tone of the chord now, folded into [lo, lo+12) */
 {
@@ -389,6 +408,18 @@ static void drift_prog_start(void)
 
 static const int8_t MEL_STEP[10] = {0, 0, 0, 2, 2, 4, 4, 4, 1, 5};   /* the chord's tones, sometimes the 2nd or the 6th */
 
+/* a melody step above the chord's root: mostly its tones, sometimes the 2nd or the 6th of the scale when they fit */
+static int8_t drift_mel_pick(void)
+{
+    uint32_t tries;
+    for (tries = 0; tries < 4u; tries++) {
+        int8_t s = MEL_STEP[drift_rand(10u)];
+        if (drift_fits(drift_root + drift_step(drift_cur + s)))
+            return s;
+    }
+    return 0;
+}
+
 /* MELODY, one sixteenth (q: its place in the bar), as the behaviour has it */
 static void drift_melody(const drift_beh_t *b, uint32_t q, int32_t lo, const int32_t *st)
 {
@@ -399,13 +430,18 @@ static void drift_melody(const drift_beh_t *b, uint32_t q, int32_t lo, const int
             return;
         if (drift_rand(4u) == 0u)
             drift_mel_dir = (int8_t)-drift_mel_dir;
-        drift_mel_step = (int8_t)(drift_mel_step + drift_mel_dir);
-        if (drift_mel_step > 9 || drift_mel_step < 0) {
-            drift_mel_dir = (int8_t)-drift_mel_dir;
-            drift_mel_step = (int8_t)(drift_mel_step + 2 * drift_mel_dir);
+        for (i = 0; i < 3u; i++) {                       /* a step, and another past a note that would rub */
+            drift_mel_step = (int8_t)(drift_mel_step + drift_mel_dir);
+            if (drift_mel_step > 9 || drift_mel_step < 0) {
+                drift_mel_dir = (int8_t)-drift_mel_dir;
+                drift_mel_step = (int8_t)(drift_mel_step + 2 * drift_mel_dir);
+            }
+            n = (uint32_t)(drift_fold(drift_root + drift_step(drift_cur), lo + 5) + drift_step(drift_cur + drift_mel_step) -
+                           drift_step(drift_cur));
+            if (drift_fits((int32_t)n) && (n + 1u) % 12u != drift_last % 12u && (n + 11u) % 12u != drift_last % 12u)
+                break;                                   /* (nor a semitone from its last note, still ringing) */
         }
-        n = (uint32_t)(drift_fold(drift_root + drift_step(drift_cur), lo + 5) + drift_step(drift_cur + drift_mel_step) -
-                       drift_step(drift_cur));
+        drift_last = (uint8_t)n;
         if (q % 4u == 0u || drift_chance(90u, 128u))
             drift_strike(DL_MELODY, DRIFT_BELL, n, q % 8u ? 42u + drift_rand(14u) : 60u);
         return;
@@ -428,7 +464,7 @@ static void drift_melody(const drift_beh_t *b, uint32_t q, int32_t lo, const int
             return;
         if (!drift_motif_ok) {
             for (i = 0; i < 4u; i++)
-                drift_motif[i] = MEL_STEP[drift_rand(10u)];
+                drift_motif[i] = drift_mel_pick();
             drift_motif_ok = 1;
         }
         if (q == 0u || drift_chance(96u, 128u))
@@ -438,7 +474,7 @@ static void drift_melody(const drift_beh_t *b, uint32_t q, int32_t lo, const int
         if (drift_mel_wait && --drift_mel_wait)
             return;
         for (i = 0; i < 3u; i++) {                       /* not the note just played, if it can help it */
-            n = drift_note(MEL_STEP[drift_rand(10u)], lo + 9);
+            n = drift_note(drift_mel_pick(), lo + 9);
             if (n != drift_last)
                 break;
         }
