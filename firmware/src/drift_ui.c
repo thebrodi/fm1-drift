@@ -290,7 +290,8 @@ static void drift_input(void)
         drift_head = 1;
     }
     if ((s = drift_turn(EN_SELECT)) != 0) {
-        drift_prog = (uint8_t)(((int32_t)drift_prog + s + (int32_t)DP_N) % (int32_t)DP_N);
+        int32_t v = (int32_t)drift_tide + s;             /* TIDE: from STILL to WANDERING (not round) */
+        drift_tide = (uint8_t)(v < 0 ? 0 : v >= DT_N ? DT_N - 1 : v);
         drift_show = 2;
         drift_show_ms = fm1_ms;
         drift_head = 1;
@@ -586,25 +587,32 @@ static void drift_show_rhythm(void)
     }
 }
 
-/* the progression just turned to, as a picture: its chords in turn, the one now lit, and how long each lasts */
+/* TIDE just turned to, as a picture: its name, the chords it walks (the one now lit), how often they change, and what
+ * it does with the layers */
 static void drift_show_path(void)
 {
-    const int8_t *pr = PROG[drift_prog % DP_N];
-    uint32_t i, bars = PROG_BARS[drift_prog % DP_N];
+    static const char *const PACE[DT_N] = {"STAYS ON ONE CHORD", "A NEW CHORD EVERY 4 BARS", "A NEW CHORD EVERY 2 BARS",
+                                           "A NEW CHORD EVERY BAR"};
+    static const char *const LAYERS[DT_N] = {"THE LAYERS: YOURS", "THE LAYERS: YOURS", "NOW AND THEN A LAYER COMES OR GOES",
+                                             "LAYERS COME AND GO"};
+    const int8_t *pr = PROG[drift_path()];
+    uint32_t i, t = drift_tide % DT_N;
     int32_t x = 8;
-    cv_text(8, 2, &AF_M, DRIFT_PROG[drift_prog % DP_N], D_TEXT);
-    if (drift_prog % DP_N == DP_WANDER) {
-        cv_text(8, 34, &AF_M, "ANY CHORD THAT FITS", D_SKY);
-    } else
-        for (i = 0; i < 6u && pr[i] >= 0; i++) {         /* I -> vi -> IV -> V */
+    cv_text(8, 2, &AF_M, DRIFT_TIDE[t], D_TEXT);
+    if (t == DT_STILL)
+        cv_text(8, 28, &AF_M, drift_roman(drift_deg < 0 ? pr[0] : drift_deg), D_SKY);
+    else if (t == DT_WANDER)
+        cv_text(8, 28, &AF_M, "ANY CHORD THAT FITS", D_SKY);
+    else
+        for (i = 0; i < 6u && pr[i] >= 0; i++) {         /* I - vi - IV - V */
             if (i) {
-                cv_rect(x + 2, 43, 10, 2, D_DIM);
+                cv_rect(x + 2, 37, 10, 2, D_DIM);
                 x += 16;
             }
-            x = cv_text(x, 34, &AF_M, drift_roman(pr[i]), i == 0u ? D_SKY : D_TEXT) + 2;
+            x = cv_text(x, 28, &AF_M, drift_roman(pr[i]), pr[i] == drift_deg ? D_SKY : D_TEXT) + 2;
         }
-    cv_text(8, 64, &AF_S, !bars ? "STAYS ON ONE CHORD" : bars == 1u ? "A NEW CHORD EVERY BAR" :
-                          bars == 2u ? "A NEW CHORD EVERY 2 BARS" : "A NEW CHORD EVERY 4 BARS", D_MID);
+    cv_text(8, 54, &AF_S, PACE[t], D_MID);
+    cv_text(8, 70, &AF_S, LAYERS[t], D_MID);
 }
 
 static void drift_viz(void)
@@ -649,7 +657,7 @@ static void drift_draw_head(void)
     const drift_world_t *w = &DRIFT_WORLDS[drift_world_next];
     cv_begin(240, 24, D_BG);                             /* the three choices */
     cv_text(8, 4, &AF_S, w->name, D_TEXT);
-    cv_text(120 - text_w(&AF_S, DRIFT_PROG[drift_prog % DP_N]) / 2, 4, &AF_S, DRIFT_PROG[drift_prog % DP_N], D_TEXT);
+    cv_text(120 - text_w(&AF_S, DRIFT_TIDE[drift_tide % DT_N]) / 2, 4, &AF_S, DRIFT_TIDE[drift_tide % DT_N], D_TEXT);
     cv_text_r(232, 4, &AF_S, DRIFT_STYLE[drift_style % DS_N], D_TEXT, D_BG);
     cv_rect(8, 22, 224, 1, D_DIM);
     cv_blit(0, 4);

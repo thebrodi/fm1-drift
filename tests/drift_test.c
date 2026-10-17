@@ -4,6 +4,7 @@
  *   0. PLAY's fades and a world change's dip: rising, falling, no click, silent at the end
  *   1. every world x behaviour with every layer on: no clipping, no clicks, no DC, never silent, levels in a band
  *   2. every punch-in in every world: no clipping, no click, no level jump
+ *   4. TIDE: FLOWING and WANDERING move the optional layers now and then, STILL and CALM never; the pad and bass stay
  *   3. half an hour (simulated) of random playing: PLAY, layers, black-key chords (tapped and held), the seven knobs,
  *      OCT, the punch-ins; the output always finite, below clipping, no clicks; every note in range (the bass from E1, the voice
  *      E2..C5, the bells up to C7); never more voices than the 8;
@@ -205,12 +206,47 @@ static void restless(uint32_t minutes)
     CHECK(stuck == 0, "random playing: stuck notes after %u of %u stops", stuck, stops);
 }
 
+/* 4: TIDE moves the layers by itself: FLOWING and WANDERING change them over a few minutes, STILL and CALM never; it
+ * keeps one to three optional layers on and never touches the pad or the bass */
+static void tide(void)
+{
+    static const char *const NAME[DT_N] = {"STILL", "CALM", "FLOWING", "WANDERING"};
+    uint32_t t, k;
+    printf("-- TIDE: layer changes in 4 minutes\n");
+    for (t = 0; t < DT_N; t++) {
+        uint32_t changes = 0, was, bad = 0;
+        drift_load(0);
+        drift_tide = (uint8_t)t;
+        drift_layers = 1u << DL_PAD | 1u << DL_BASS | 1u << DL_MELODY;
+        if (!drift_run)
+            button(B_PLAY);
+        was = drift_layers;
+        for (k = 0; k < 240u * 10u; k++) {               /* 4 minutes, a look every 0.1 s */
+            uint32_t opt = drift_layers & (1u << DL_ARP | 1u << DL_SPARKLE | 1u << DL_MELODY | 1u << DL_CHOIR |
+                                           1u << DL_SHIMMER), n = 0, b;
+            run(100);
+            if (drift_layers != was)
+                changes++;
+            for (b = opt; b; b &= b - 1u)
+                n++;
+            bad += (drift_layers & (1u << DL_PAD | 1u << DL_BASS)) != (1u << DL_PAD | 1u << DL_BASS) || n > 3u ||
+                   (t >= DT_FLOW && changes && n < 1u);
+            was = drift_layers;
+        }
+        printf("  %-9s %u changes\n", NAME[t], changes);
+        CHECK(t < DT_FLOW ? changes == 0u : changes >= 3u, "TIDE %s: %u layer changes in 4 minutes", NAME[t], changes);
+        CHECK(!bad, "TIDE %s: the pad or bass touched, or more than three optional layers on (%u looks)", NAME[t], bad);
+    }
+    button(B_PLAY);
+    run(3000);
+}
+
 /* 0: PLAY's fades and a world change's dip, with their real lengths: smooth, no click, silent at the end */
 static void fades(void)
 {
     double r[12];
     uint32_t i, ok = 1;
-    printf("-- fades: PLAY in (8 s), a world change (1.5 s out, 2.5 s in), PLAY out (8 s)\n");
+    printf("-- fades: PLAY in (4 s), a world change (1.5 s out, 2.5 s in), PLAY out (6 s)\n");
     drift_load(0);
     drift_layers = (1u << DL_N) - 1u;
     button(B_PLAY);
@@ -236,7 +272,7 @@ static void fades(void)
     printf(" dBFS (now %s)\n", DRIFT_WORLDS[drift_world].name);
     CHECK(drift_world == 1u, "world change: still %s", DRIFT_WORLDS[drift_world].name);
     CHECK(r[1] < r[5] - 10.0, "world change: no dip (%.1f vs %.1f)", r[1], r[5]);
-    button(B_PLAY);                                      /* PLAY again: out over 8 s, then silence */
+    button(B_PLAY);                                      /* PLAY again: out over 6 s, then silence */
     for (i = 0; i < 10u; i++) {
         reset();
         run(1000);
@@ -263,6 +299,7 @@ int main(int argc, char **argv)
     drift_input();
     fades();
     matrix();
+    tide();
     punches();
     restless(minutes);
     CHECK(bad_note == 0, "%u voice blocks with a note out of range (bass from 28, voice 40..72, bells to 96, all to 108)", bad_note);

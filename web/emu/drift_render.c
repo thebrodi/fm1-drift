@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
 /* DRIFT, heard without a browser: the browser build (felucca_web.c) compiled natively, pressing PLAY with pad, bass, melody
- * and voice, then every behaviour, every progression, every world and the black-key chords (it prints when each
+ * and voice, then every behaviour, every TIDE, every world and the black-key chords (it prints when each
  * starts), written as a 16-bit stereo WAV, with its peak and RMS printed.
  *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -o build/drift_render web/emu/drift_render.c -lm
  *   build/drift_render OUT.wav */
@@ -83,10 +83,10 @@ int main(int argc, char **argv)
     }
     drift_style = DS_RIPPLE;
     drift_apply();
-    for (i = 0; i < DP_N; i++) {                   /* every progression, as SELECT turns (RIPPLE) */
-        drift_prog = (uint8_t)i;
-        mark(DRIFT_PROG[i]);
-        render(12000);
+    for (i = 0; i < DT_N; i++) {                   /* every TIDE, as SELECT turns (RIPPLE) */
+        drift_tide = (uint8_t)i;
+        mark(DRIFT_TIDE[i]);
+        render(i >= DT_FLOW ? 45000 : 15000);      /* (FLOWING, WANDERING: long enough for their layers to move) */
     }
     for (i = 1; i < DRIFT_NWORLDS; i++) {          /* every world, as PRESETS turns: its own sounds, voice, behaviour */
         drift_load(i);

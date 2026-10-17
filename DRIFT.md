@@ -9,7 +9,8 @@ it plays on, you shape it live).
 
 **How it plays:** press PLAY and a gentle chord progression starts and keeps going. The white keys
 add and remove layers (lit = playing). The four knobs shape it live. The black keys are chords to
-jump to. PRESETS, ALGORITHM and SELECT pick the world, the behaviour and the progression. No drums.
+jump to. PRESETS, ALGORITHM and SELECT pick the world, how it plays, and how much it moves by itself (TIDE). No
+drums.
 
 ## Rules
 
@@ -30,7 +31,7 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 
 | Control | Does |
 |---|---|
-| **PLAY** | Starts the music with an 8 s fade in; pressed again, an 8 s fade out, then it stops |
+| **PLAY** | Starts the music with a 4 s fade in; pressed again, a 6 s fade out, then it stops |
 | **KNOB 1 — Space** | Reverb: dry and close → a vast hall |
 | **KNOB 2 — Echo** | Delay: none → long repeating trails |
 | **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness, the analog pads' filter; the bells half as much) |
@@ -39,7 +40,7 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 | **Black keys** | Chords to jump to: press = go there, hold = stay, let go = the progression carries on |
 | **PRESETS** knob | The world: the sounds, the key and the tempo. Playing, a change dips out (1.5 s) and back in (2.5 s): no cut |
 | **ALGORITHM** knob | The behaviour: how every layer plays (DRIFT, RIPPLE, SWELL, CHIME, PULSE); its rhythm shown a moment |
-| **SELECT** knob | The progression: which chords the music walks through; its chord path shown a moment |
+| **SELECT** knob | TIDE: how much the music moves by itself (STILL, CALM, FLOWING, WANDERING); shown a moment |
 | **OCT− / OCT+** | Everything an octave down / up |
 | **FX SCL ENV LFO EDIT GLO** | Punch-in effects on the whole sound while held (below) |
 | Other buttons | Unused |
@@ -104,20 +105,26 @@ sound's own envelopes shape it.) Each world starts in its own; ALGORITHM turns f
 | CHIME | normal | still, quicker and brighter | quick figures of three high notes, then a rest |
 | PULSE | normal | a soft pulse on every beat | a four-note motif on the beats, new with each chord; the bass on the quarters |
 
-### Progressions (SELECT)
+### TIDE (SELECT)
 
-Turning SELECT starts the new progression on the next beat. Each has its own shape and pace:
+How much the music moves by itself. The black keys stay your own hands on the chords: TIDE is what
+happens when you leave it alone, which matters most in a long session. Turning it changes the pace
+from the next chord on (no jump).
 
-| Progression | Chords | Each chord lasts |
+| TIDE | Chords | Layers |
 |---|---|---|
-| DRONE | I | forever |
-| HOME | I vi IV V | 2 bars |
-| FLOAT | I IV (rocking) | 2 bars |
-| LONGING | vi iii IV I | 4 bars |
-| RISE | I iii IV V vi (climbing) | 1 bar |
-| WANDER | anywhere that fits, at random | 1 bar |
+| STILL | One chord; nothing moves on its own (you lead with the black keys) | Only yours |
+| CALM | The world's chord path, a new chord every 4 bars | Only yours |
+| FLOWING | The world's chord path, every 2 bars | Now and then (every 8–16 bars) one layer gently joins or leaves |
+| WANDERING | Any chord that fits, every bar | Layers come and go more often (every 4–8 bars) |
 
-In a minor world the same progressions turn minor (HOME: i VI iv v), and the black keys play
+TIDE only moves the optional layers (ARP, SPARKLE, MELODY, VOX, SHIMMER), keeps one to three of them
+on, and never touches the pad or the bass. It starts at CALM and stays as you set it across worlds.
+
+Each world has its own chord path: DRONE (one chord), HOME (I vi IV V), FLOAT (I IV), LONGING
+(vi iii IV I) or RISE (I iii IV V vi).
+
+In a minor world the same paths turn minor (HOME: i VI iv v), and the black keys play
 VI iv v VII i (no diminished chords, so nothing sounds harsh).
 
 ### Worlds (PRESETS)
@@ -126,7 +133,7 @@ A world is a whole mood: the key and its mode, the tempo, and the sound of each 
 patches (`tools/gen_drift_patches.py`: bowl, drone, dark pad, crystal, kalimba, soft keys) are loaded
 into a part as its own patch; Felucca's factory sounds stay as they are.
 
-| World | Key | BPM | Pad | Bells (ARP, SPARKLE, MELODY) | VOX | Starts in |
+| World | Key | BPM | Pad | Bells (ARP, SPARKLE, MELODY) | VOX | Behaviour, chord path |
 |---|---|---|---|---|---|---|
 | GLASS | D major | 72 | FM pad | glass bell | airy, high "aah" | DRIFT, HOME |
 | EMBER | A major | 66 | analog strings | electric piano | warm "ooh" | RIPPLE, FLOAT |
@@ -155,10 +162,10 @@ solid discs on deep navy; nothing glows.
 
 | Where | Shows |
 |---|---|
-| Top | The three choices: world (PRESETS), progression (SELECT), behaviour (ALGORITHM), over a thin line |
+| Top | The three choices: world (PRESETS), TIDE (SELECT), behaviour (ALGORITHM), over a thin line |
 | Below | The chord now (`vi`, `V add9  HELD`), or PRESS PLAY |
 | Layers | The seven layers, underlined while on |
-| Middle | The world's quiet picture, the sounding notes in it as solid discs that dim as they fade; a punch-in's name on a pill while it plays. For 2.5 s after ALGORITHM turns: its rhythm (sixteen steps for ARP, MEL and BASS, lit where they play; HALF TIME; the pad's breathing as a curve). After SELECT turns: its chord path (I – vi – IV – V) and how long each chord lasts |
+| Middle | The world's quiet picture, the sounding notes in it as solid discs that dim as they fade; a punch-in's name on a pill while it plays. For 2.5 s after ALGORITHM turns: its rhythm (sixteen steps for ARP, MEL and BASS, lit where they play; HALF TIME; the pad's breathing as a curve). After SELECT turns: the TIDE, its chord path (I – vi – IV – V, the chord now lit), how often it changes, and what it does with the layers |
 | Knobs | SPACE, ECHO, GLOW, MOTION: a rounded bar in each knob's colour, and the value |
 | Bottom | Key, mode and tempo; the octave when shifted |
 

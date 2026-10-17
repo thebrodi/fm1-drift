@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
-/* DRIFT's harmony check: every world x behaviour x progression with every layer on, the notes that sound together
+/* DRIFT's harmony check: every world x behaviour x TIDE with every layer on, the notes that sound together
  * sampled every block. A clash is two notes a semitone apart (in pitch class: a minor 2nd, a major 7th, a minor 9th)
  * both heard: held, or struck within the last 0.6 s, and since the chord now began (a bell of the chord before still
  * ringing over the next is a crossfade, not a wrong note). Prints the share of time with a clash, worst first, and which
@@ -40,7 +40,7 @@ static uint32_t heard(uint8_t *n, uint8_t *pt)
 int main(int argc, char **argv)
 {
     uint32_t secs = argc > 1 ? (uint32_t)atoi(argv[1]) : 20u, w, st, pg, worst_fail = 0;
-    struct { double share; uint32_t w, st, pg; } r[DRIFT_NWORLDS * DS_N * DP_N];
+    struct { double share; uint32_t w, st, pg; } r[DRIFT_NWORLDS * DS_N * DT_N];
     uint32_t nr = 0, i, j;
     web_nor_erase();
     web_boot();
@@ -49,11 +49,11 @@ int main(int argc, char **argv)
     drift_fade_in_ms = drift_fade_out_ms = 0;            /* (no fades: the music from its first block) */
     for (w = 0; w < DRIFT_NWORLDS; w++)
         for (st = 0; st < DS_N; st++)
-            for (pg = 0; pg < DP_N; pg++) {
+            for (pg = 0; pg < DT_N; pg++) {
                 uint32_t blocks = 0, bad = 0, k;
                 drift_load(w);
                 drift_style = (uint8_t)st;
-                drift_prog = (uint8_t)pg;
+                drift_tide = (uint8_t)pg;
                 drift_apply();
                 drift_layers = (1u << DL_N) - 1u;
                 drift_run = 1;
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
             if (r[j].share > r[i].share) { __typeof__(r[0]) t = r[i]; r[i] = r[j]; r[j] = t; }
     printf("time with a semitone clash, worst 15 of %u:\n", nr);
     for (i = 0; i < nr && i < 15u; i++)
-        printf("  %5.1f %%  %-6s %-6s %s\n", r[i].share, DRIFT_WORLDS[r[i].w].name, DRIFT_STYLE[r[i].st], DRIFT_PROG[r[i].pg]);
+        printf("  %5.1f %%  %-6s %-6s %s\n", r[i].share, DRIFT_WORLDS[r[i].w].name, DRIFT_STYLE[r[i].st], DRIFT_TIDE[r[i].pg]);
     {
         double sum = 0; for (i = 0; i < nr; i++) sum += r[i].share, worst_fail += r[i].share > 3.0;
         printf("average %.1f %%, %u of %u above 3 %%\n", sum / nr, worst_fail, nr);

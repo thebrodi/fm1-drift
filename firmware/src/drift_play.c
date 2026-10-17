@@ -35,17 +35,28 @@ static const uint8_t DRIFT_PUNCH[DP_NPUNCH] = {PF_ETHR, PF_R16, PF_FRZ, PF_OUP, 
 static const char *const DRIFT_PUNCH_NAME[DP_NPUNCH] = {"ECHOES", "STUTTER", "FREEZE", "SHIMMER", "UNDERWATER", "WASH"};
 static const uint8_t DRIFT_SCALE[2][7] = {{0, 2, 4, 5, 7, 9, 11}, {0, 2, 3, 5, 7, 8, 10}};   /* major, natural minor */
 
-/* ------------------------------------------------------- progressions --- */
+/* ------------------------------------------------------- chord paths --- */
+/* each world's own chord path (drift_ui.c DRIFT_WORLDS .prog): scale degrees 0..6 (I..vii), -1 ends. DRONE stays, HOME
+ * goes round, FLOAT rocks between two, LONGING leans sad, RISE climbs; WANDER (TIDE WANDERING) goes anywhere that fits
+ * (DRIFT_WANDER) */
 #define DP_WANDER 5u
 static const char *const DRIFT_PROG[] = {"DRONE", "HOME", "FLOAT", "LONGING", "RISE", "WANDER"};
 #define DP_N (sizeof DRIFT_PROG / sizeof DRIFT_PROG[0])
-/* scale degrees 0..6 (I..vii), -1 ends (WANDER picks from DRIFT_WANDER); and how many bars each chord lasts (DRONE: it
- * never moves). Each its own shape: DRONE stays, HOME goes round, FLOAT rocks between two, LONGING leans sad and slow,
- * RISE climbs a step a bar, WANDER moves every bar to anywhere that fits */
 static const int8_t PROG[DP_N][6] = {
     {0, -1}, {0, 5, 3, 4, -1}, {0, 3, -1}, {5, 2, 3, 0, -1}, {0, 2, 3, 4, 5, -1}, {0, -1},
 };
-static const uint8_t PROG_BARS[DP_N] = {0, 2, 2, 4, 1, 1};
+
+/* ---------------------------------------------------------------- tide --- */
+/* TIDE (SELECT): how much the music moves by itself; the black keys stay the hands' own chords.
+ *   STILL      one chord; nothing moves on its own
+ *   CALM       the world's chord path, a chord every 4 bars
+ *   FLOWING    .. every 2 bars, and now and then (every 8..16 bars) one layer gently joins or leaves
+ *   WANDERING  any chord that fits, every bar; layers come and go more often (every 4..8 bars)
+ * The layers it moves are the optional ones (ARP SPARKLE MELODY VOX SHIMMER), never the pad or the bass, and it keeps
+ * one to three of them on. */
+enum { DT_STILL, DT_CALM, DT_FLOW, DT_WANDER, DT_N };
+static const char *const DRIFT_TIDE[DT_N] = {"STILL", "CALM", "FLOWING", "WANDERING"};
+static const uint8_t TIDE_BARS[DT_N] = {0, 4, 2, 1};   /* a chord lasts (0: for ever) */
 
 /* -------------------------------------------------------- behaviours --- */
 /* A behaviour (ALGORITHM) is the character of the whole piece: its pace (DRIFT and SWELL at half time), how the pad
@@ -75,11 +86,12 @@ static const drift_beh_t DRIFT_BEH[DS_N] = {
 /* --------------------------------------------- shared with the UI ---- */
 static volatile uint8_t drift_run;       /* PLAY: the music asked for (the UI; a stop fades out first: drift_on) */
 static volatile uint8_t drift_on;        /* the music is going: notes come (from PLAY until its fade out has ended) */
-static volatile uint32_t drift_fade_in_ms = 8000u, drift_fade_out_ms = 8000u;   /* PLAY's fades (the tests: 0, none) */
+static volatile uint32_t drift_fade_in_ms = 4000u, drift_fade_out_ms = 6000u;   /* PLAY's fades (the tests: 0, none) */
 static volatile uint8_t drift_xf_req;    /* the UI: a world change, fade out (the ISR sets drift_xf_ready at silence) */
 static volatile uint8_t drift_xf_ready;  /* .. silent: the UI loads the new world, clears both, and it fades in */
 static volatile uint8_t drift_style;     /* ALGORITHM: DS_* */
-static volatile uint8_t drift_prog = 1;  /* SELECT: the progression */
+static volatile uint8_t drift_prog = 1;  /* the world's chord path (PROG) */
+static volatile uint8_t drift_tide = DT_CALM;   /* SELECT: TIDE (DT_*) */
 static volatile uint8_t drift_motion = 50;   /* KNOB 4: 0..127 */
 static volatile int8_t drift_oct;        /* OCT- / OCT+: -1 .. +1 */
 static volatile uint8_t drift_root = 2;  /* the world's key (D) */
@@ -211,7 +223,7 @@ static int8_t drift_mel_dir = 1;         /* .. and which way it goes */
 static uint8_t drift_mel_burst;          /* MM_BURST: notes of the figure still to come */
 static int8_t drift_motif[4];            /* MM_MOTIF: the motif, scale steps above the chord's root */
 static uint8_t drift_motif_ok;           /* 0: draw a new one at the next beat (a new chord) */
-static uint8_t drift_prog_was;           /* the progression the music walks (SELECT turned: the new one at the next beat) */
+static uint8_t drift_tide_wait;          /* TIDE: bars to its next layer change */
 static volatile uint32_t drift_tick;     /* sixteenths since PLAY */
 static volatile uint32_t drift_since;    /* the sixteenth the chord began on (the screen counts its bars) */
 static int32_t drift_clock;              /* samples to the next sixteenth */
@@ -305,11 +317,14 @@ static void drift_voice_held(void)
     drift_hold_set(&drift_choir, want, n, 76);
 }
 
-/* the next chord of the progression (WANDER: another of its chords, at random) */
+/* the chord path the music walks: the world's, or anywhere (TIDE WANDERING) */
+static uint32_t drift_path(void) { return drift_tide == DT_WANDER ? DP_WANDER : drift_prog % DP_N; }
+
+/* the next chord of the path (WANDER: another chord that fits, at random) */
 static void drift_advance(void)
 {
-    const int8_t *p = PROG[drift_prog % DP_N];
-    if (drift_prog % DP_N == DP_WANDER) {
+    const int8_t *p = PROG[drift_path()];
+    if (drift_path() == DP_WANDER) {
         int8_t d;
         do
             d = DRIFT_WANDER[drift_minor & 1u][drift_rand(5u)];
@@ -331,7 +346,7 @@ static void drift_advance(void)
 /* a black key: to chord d now (bright: its add9), the progression's place moved to it when it has it */
 static void drift_jump(int32_t d, uint32_t bright)
 {
-    const int8_t *p = PROG[drift_prog % DP_N];
+    const int8_t *p = PROG[drift_path()];
     uint32_t i;
     for (i = 0; i < 5u && p[i] >= 0; i++)
         if (p[i] == d) {
@@ -429,12 +444,11 @@ static void drift_punch_sync(uint32_t want)
 /* ------------------------------------------------------------ player --- */
 static uint8_t drift_was_run;
 
-/* the progression from its first chord (WANDER: any of its chords) */
+/* the path from its first chord (WANDER: any that fits) */
 static void drift_prog_start(void)
 {
-    drift_prog_was = drift_prog;
     drift_pos = 0;
-    drift_cur = drift_prog % DP_N == DP_WANDER ? DRIFT_WANDER[drift_minor & 1u][drift_rand(5u)] : PROG[drift_prog % DP_N][0];
+    drift_cur = drift_path() == DP_WANDER ? DRIFT_WANDER[drift_minor & 1u][drift_rand(5u)] : PROG[drift_path()][0];
     drift_bright = 0;
     drift_since = drift_tick;
     drift_motif_ok = 0;
@@ -454,6 +468,23 @@ static int8_t drift_mel_pick(void)
             return s;
     }
     return 0;
+}
+
+/* TIDE: one of the optional layers joins or leaves, keeping one to three of them on (a noise pad has no shimmer) */
+static void drift_tide_layer(void)
+{
+    static const uint8_t OPT[5] = {DL_ARP, DL_SPARKLE, DL_MELODY, DL_CHOIR, DL_SHIMMER};
+    uint32_t i, on = 0, n = drift_pad_noise ? 4u : 5u, add, k;
+    for (i = 0; i < n; i++)
+        on += (drift_layers >> OPT[i]) & 1u;
+    add = on <= 1u ? 1u : on >= 3u ? 0u : drift_rand(2u);
+    for (i = 0, k = drift_rand(n); i < n; i++, k = (k + 1u) % n)   /* the first, from a random place, that can change */
+        if (((drift_layers >> OPT[k]) & 1u) != add) {
+            drift_layers ^= (uint8_t)(1u << OPT[k]);
+            drift_voice_held();
+            drift_seen++;
+            return;
+        }
 }
 
 /* MELODY, one sixteenth (q: its place in the bar), as the behaviour has it */
@@ -526,14 +557,16 @@ static void drift_sixteenth(void)
 {
     const drift_beh_t *b = &DRIFT_BEH[drift_style % DS_N];
     int32_t lo = drift_lo(), st[3];
-    uint32_t q = drift_tick % 16u, L = drift_layers, bars = PROG_BARS[drift_prog % DP_N];
-    if (drift_prog != drift_prog_was && q % 4u == 0u && drift_pin == 0xFF) {   /* SELECT turned: the new one, on the beat */
-        drift_prog_start();
-        drift_voice_held();
-    } else if (bars && q == 0u && drift_pin == 0xFF && drift_tick - drift_since >= 16u * bars) {   /* the next chord */
+    uint32_t q = drift_tick % 16u, L, bars = TIDE_BARS[drift_tide % DT_N];
+    if (bars && q == 0u && drift_pin == 0xFF && drift_tick - drift_since >= 16u * bars) {   /* the next chord */
         drift_advance();
         drift_voice_held();
     }
+    if (q == 0u && drift_tide >= DT_FLOW && (!drift_tide_wait || !--drift_tide_wait)) {   /* TIDE: a layer comes or goes */
+        drift_tide_layer();
+        drift_tide_wait = (uint8_t)(drift_tide == DT_FLOW ? 8u + drift_rand(9u) : 4u + drift_rand(5u));
+    }
+    L = drift_layers;
     if (q % 4u == 0u) {                                  /* a beat: the punch-ins held now play it; let go, they end */
         drift_punch_sync(drift_punch_want | drift_punch_tap);
         drift_punch_tap = 0;
@@ -606,6 +639,7 @@ static void drift_player(uint32_t n)
         drift_mel_wait = 2;
         drift_mel_burst = 0;
         drift_choir_wait = 0;
+        drift_tide_wait = 8;                             /* (TIDE's first layer change: not at once) */
         drift_prog_start();
         drift_voice_held();                              /* (stopped: everything held lets go, the tails ring) */
     }
