@@ -8,6 +8,8 @@ Press PLAY and a gentle chord progression starts and keeps going. Add and remove
 to other chords with the black keys, and shape everything live with the four knobs. Every note fits, so it always sounds
 good. No menus, no drums.
 
+**Website:** <https://thebrodi.github.io/fm1-drift/> · **[Try it in your browser](https://thebrodi.github.io/fm1-drift/try/)**, no FM-1 needed.
+
 > **Work in progress.** Drift runs in the browser emulator. It has not been flashed to an FM-1 yet.
 
 ## Why Drift

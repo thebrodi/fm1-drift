@@ -150,6 +150,10 @@ sh web/emu/build.sh                                                             
 python3 -m http.server -d build/emu 8790                                               # http://localhost:8790/
 ```
 
+The website (<https://thebrodi.github.io/fm1-drift/>) is the `gh-pages` branch: `tools/make_drift_site.py
+build/site` puts the landing page (`web/site/index.html`), the emulator (`try/`) and the installer (`install/`, once
+there is a package) together, and that folder is pushed as the branch.
+
 To hear it without a browser, `web/emu/drift_render.c` presses PLAY, adds the layers one by one, then goes through
 the behaviours, a progression and the black-key chords, into a WAV (the build command is at the top of the file; add
 `-DDRIFT_TRACE` to print every note struck).
