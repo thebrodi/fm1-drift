@@ -514,6 +514,7 @@ static void drift_splash(void)
     cv_text(120 - text_w(&AF_L, "DRIFT") / 2, 72, &AF_L, "DRIFT", D_TEXT);
     cv_blit(0, 46);
     draw_text_line(0, 176, 240, &AF_S, "DREAM FIRMWARE FOR THE FM-1", D_MID, D_BG, 1);
+    draw_text_line(0, 196, 240, &AF_S, FELUCCA_VERSION, D_DIM, D_BG, 1);
 }
 
 static void drift_draw(void)
