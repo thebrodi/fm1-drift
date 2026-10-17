@@ -587,32 +587,41 @@ static void drift_show_rhythm(void)
     }
 }
 
-/* TIDE just turned to, as a picture: its name, the chords it walks (the one now lit), how often they change, and what
- * it does with the layers */
+/* TIDE just turned to, as a picture: water. STILL a flat line, CALM long swells, FLOWING rolling waves, WANDERING
+ * choppy ones; the chords of its path sit on the wave as discs (the one now lit, its numeral under it); over FLOWING and
+ * WANDERING a few small lights rise and sink: the layers that come and go */
 static void drift_show_path(void)
 {
-    static const char *const PACE[DT_N] = {"STAYS ON ONE CHORD", "A NEW CHORD EVERY 4 BARS", "A NEW CHORD EVERY 2 BARS",
-                                           "A NEW CHORD EVERY BAR"};
-    static const char *const LAYERS[DT_N] = {"THE LAYERS: YOURS", "THE LAYERS: YOURS", "NOW AND THEN A LAYER COMES OR GOES",
-                                             "LAYERS COME AND GO"};
+    static const uint8_t AMP[DT_N] = {0, 5, 10, 14};    /* the wave: its height .. */
+    static const uint16_t LEN[DT_N] = {1, 160, 90, 46};   /* .. and its length (px) */
+    static const uint8_t FLOAT[DT_N] = {0, 0, 2, 4};    /* the lights over it */
     const int8_t *pr = PROG[drift_path()];
-    uint32_t i, t = drift_tide % DT_N;
-    int32_t x = 8;
+    uint32_t t = drift_tide % DT_N, i, n = 0, ph = viz_ph * (2u + t * 2u);
+    int32_t m = (int32_t)VIZ_H / 2 + 6, x;
     cv_text(8, 2, &AF_M, DRIFT_TIDE[t], D_TEXT);
-    if (t == DT_STILL)
-        cv_text(8, 28, &AF_M, drift_roman(drift_deg < 0 ? pr[0] : drift_deg), D_SKY);
-    else if (t == DT_WANDER)
-        cv_text(8, 28, &AF_M, "ANY CHORD THAT FITS", D_SKY);
+    for (x = 0; x < 240; x++) {                          /* the water, two pixels thick */
+        int32_t y = m + v_sin((uint32_t)x * 1024u / LEN[t] + ph, AMP[t]);
+        cv_pset(x, y, D_SKY);
+        cv_pset(x, y + 1, d_tone(D_SKY, 6));
+    }
+    if (t == DT_STILL || t == DT_WANDER)                 /* the chords: one (STILL), or any (WANDERING: five) */
+        n = t == DT_STILL ? 1u : 5u;
     else
-        for (i = 0; i < 6u && pr[i] >= 0; i++) {         /* I - vi - IV - V */
-            if (i) {
-                cv_rect(x + 2, 37, 10, 2, D_DIM);
-                x += 16;
-            }
-            x = cv_text(x, 28, &AF_M, drift_roman(pr[i]), pr[i] == drift_deg ? D_SKY : D_TEXT) + 2;
-        }
-    cv_text(8, 54, &AF_S, PACE[t], D_MID);
-    cv_text(8, 70, &AF_S, LAYERS[t], D_MID);
+        while (n < 6u && pr[n] >= 0)
+            n++;
+    for (i = 0; i < n; i++) {
+        int32_t cx = n == 1u ? 120 : 30 + (int32_t)(i * 180u / (n - 1u)), cy = m + v_sin((uint32_t)cx * 1024u / LEN[t] + ph,
+                                                                                         AMP[t]) - 1;
+        int deg = t == DT_STILL ? (drift_deg < 0 ? pr[0] : drift_deg) : t == DT_WANDER ? -1 : pr[i];
+        int now = deg >= 0 && deg == drift_deg;
+        d_disc(cx, cy, now ? 7 : 5, now ? D_PEACH : D_LILAC, now ? 32u : 18u);
+        if (deg >= 0)
+            cv_text(cx - text_w(&AF_S, drift_roman(deg)) / 2, cy + 10, &AF_S, drift_roman(deg), now ? D_TEXT : D_MID);
+    }
+    for (i = 0; i < FLOAT[t]; i++) {                     /* the layers that come and go: lights rising and sinking */
+        int32_t lx = 40 + (int32_t)i * 52, ly = m - 18 + v_sin(viz_ph * (5u + i * 2u) + i * 300u, 10);
+        d_disc(lx, ly, 3, DRIFT_KCOL[i % DK_N], 26);
+    }
 }
 
 static void drift_viz(void)

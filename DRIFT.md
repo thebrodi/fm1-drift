@@ -165,7 +165,7 @@ solid discs on deep navy; nothing glows.
 | Top | The three choices: world (PRESETS), TIDE (SELECT), behaviour (ALGORITHM), over a thin line |
 | Below | The chord now (`vi`, `V add9  HELD`), or PRESS PLAY |
 | Layers | The seven layers, underlined while on |
-| Middle | The world's quiet picture, the sounding notes in it as solid discs that dim as they fade; a punch-in's name on a pill while it plays. For 2.5 s after ALGORITHM turns: its rhythm (sixteen steps for ARP, MEL and BASS, lit where they play; HALF TIME; the pad's breathing as a curve). After SELECT turns: the TIDE, its chord path (I – vi – IV – V, the chord now lit), how often it changes, and what it does with the layers |
+| Middle | The world's quiet picture, the sounding notes in it as solid discs that dim as they fade; a punch-in's name on a pill while it plays. For 2.5 s after ALGORITHM turns: its rhythm (sixteen steps for ARP, MEL and BASS, lit where they play; HALF TIME; the pad's breathing as a curve). After SELECT turns: the TIDE as water (STILL a flat line, CALM long swells, FLOWING rolling waves, WANDERING choppy ones), the chords of its path riding on it (the one now lit, its numeral under it), and over FLOWING and WANDERING a few small lights rising and sinking: the layers that come and go |
 | Knobs | SPACE, ECHO, GLOW, MOTION: a rounded bar in each knob's colour, and the value |
 | Bottom | Key, mode and tempo; the octave when shifted |
 
