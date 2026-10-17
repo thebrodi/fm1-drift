@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
-/* DRIFT, heard without a browser: the browser build (felucca_web.c) compiled natively, playing a short progression on
- * the keys (I - vi - IV - Vsus4), then the player in each style (DRIFT RIPPLE SWELL CHIME PULSE, 8 s each), written as a 16-bit stereo WAV, with its peak and RMS printed.
+/* DRIFT, heard without a browser: the browser build (felucca_web.c) compiled natively, pressing PLAY, adding the layers
+ * one by one, then each behaviour, a progression and the nudges (it prints when each starts), written as a 16-bit
+ * stereo WAV, with its peak and RMS printed.
  *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -o build/drift_render web/emu/drift_render.c -lm
  *   build/drift_render OUT.wav */
 #include "felucca_web.c"
@@ -35,15 +36,29 @@ static void render(double ms)
 static void put32(uint32_t v) { fputc(v & 255, out); fputc(v >> 8 & 255, out); fputc(v >> 16 & 255, out); fputc(v >> 24, out); }
 static void put16(uint32_t v) { fputc(v & 255, out); fputc(v >> 8 & 255, out); }
 
-/* key k of the 27 (0 = F3) held for ms, with black key b (-1 none) */
-static void chord(uint32_t k, int32_t b, double ms)
+/* the white key of layer l and the black key of nudge j (keys from F3 = 0; the first octave's) */
+static const uint8_t WHITE[7] = {0, 2, 4, 6, 7, 9, 11}, BLACK[5] = {1, 3, 5, 8, 10};
+static void tap(uint32_t k)
 {
-    web_keys(1u << k | (b >= 0 ? 1u << b : 0u));
-    render(ms);
+    web_keys(1u << k);
+    render(60);
+    web_keys(0);
+    render(40);
+}
+static void play(void)
+{
+    web_buttons(1u << B_PLAY);
+    render(20);
+    web_buttons(0);
+}
+static void mark(const char *what)
+{
+    printf("%6.1f s  %s\n", frames / (double)FS, what);
 }
 
 int main(int argc, char **argv)
 {
+    uint32_t i;
     if (argc < 2 || !(out = fopen(argv[1], "wb")))
         return 2;
     fwrite("RIFF\0\0\0\0WAVEfmt ", 1, 16, out);
@@ -54,28 +69,34 @@ int main(int argc, char **argv)
     render(600);                                   /* the splash */
     frames = 0;
     sum2 = peak = 0;
-    chord(12, -1, 3000);                           /* I   (white place 7: keys from F3, F3 = 0) */
-    chord(21, -1, 3000);                           /* vi  (place 12) */
-    chord(18, -1, 3000);                           /* IV  (place 10) */
-    chord(19, 20, 3000);                           /* V   (place 11) with black place 8: SUS4 */
-    web_keys(0);
-    render(2000);
-    {   /* the player: each style for 8 s over a chord tapped at its start (I, vi, IV, ii, V) */
-        static const uint8_t KEY[DS_N] = {12, 21, 18, 14, 19};
-        uint32_t st;
-        web_buttons(1u << B_PLAY);
-        render(20);
-        web_buttons(0);
-        for (st = 0; st < DS_N; st++) {
-            drift_style = (uint8_t)st;
-            chord(KEY[st], -1, 300);
-            web_keys(0);
-            render(7700);
-        }
-        web_buttons(1u << B_PLAY);
-        render(20);
-        web_buttons(0);
+    mark("PLAY: PAD + MELODY, GLASS, HOME, DRIFT");
+    play();
+    render(14000);
+    for (i = 1; i < 7u; i++) {                     /* the other layers, one by one */
+        static const char *const N[7] = {"", "+ BASS", "+ ARP", "+ SPARKLE", "- MELODY", "+ CHOIR", "+ SHIMMER"};
+        mark(N[i]);
+        tap(WHITE[i == 4u ? 4u : i]);
+        render(7000);
     }
+    for (i = 1; i < DS_N; i++) {                   /* every behaviour */
+        drift_style = (uint8_t)i;
+        mark(DRIFT_STYLE[i]);
+        render(10000);
+    }
+    drift_style = DS_RIPPLE;
+    drift_prog = 3;
+    mark("RIPPLE, LONGING; then BRIGHT, NEXT, DARK, HOLD");
+    render(8000);
+    tap(BLACK[DN_BRIGHT]);
+    render(6000);
+    tap(BLACK[DN_NEXT]);
+    render(4000);
+    tap(BLACK[DN_DARK]);
+    render(6000);
+    tap(BLACK[DN_HOLD]);
+    render(6000);
+    mark("stop");
+    play();
     render(5000);                                  /* the tails */
     fseek(out, 4, SEEK_SET);
     put32(36u + frames * 4u);

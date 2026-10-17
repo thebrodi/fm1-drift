@@ -3,8 +3,12 @@
 Drift is a firmware for the M-VAVE FM-1, forked from Felucca. It is a small, simple instrument for
 dreamy, ambient music that always sounds good: it keeps playing by itself, and you steer it live.
 
-Inspiration: the HiChord (every key is a chord that fits) and the OP-1's generative playing (press
-play, it plays on, you shape it with effects).
+Inspiration: the HiChord (everything you press fits) and the OP-1's generative playing (press play,
+it plays on, you shape it live).
+
+**How it plays:** press PLAY and a gentle chord progression starts and keeps going. The white keys
+add and remove layers (lit = playing). The four knobs shape it live. The black keys nudge the
+harmony. PRESETS, ALGORITHM and SELECT pick the world, the behaviour and the progression. No drums.
 
 ## Rules
 
@@ -12,11 +16,12 @@ These hold for every feature. If an idea breaks one, the idea changes, not the r
 
 1. **No menus.** No button opens a page, a layer or a sub-menu. Every control does one thing, the
    same thing all the time.
-2. **No wrong notes.** Everything is locked to a key and scale. Any key, at any time, sounds good
-   with what is already playing.
-3. **Always sounds good.** Soft envelopes, curated presets, a limiter on the output. No setting
-   makes it harsh, silent or clipped.
+2. **No wrong notes.** Everything is locked to a key and scale. Nothing you press can clash with
+   what is already playing.
+3. **Always sounds good.** Soft envelopes, curated sounds, balanced levels. No setting makes it
+   harsh, silent or clipped.
 4. **Few functions.** Things that are not listed below are not in the instrument.
+5. **The knobs come first.** KNOB 1–4 are the main way to play it live.
 
 ## Controls
 
@@ -24,39 +29,67 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 
 | Control | Does |
 |---|---|
-| **PRESETS** knob | Picks the sound: about 8–12 hand-tuned FM patches (glass pad, choir, music box, warm drone, bowed bell, …) |
-| **ALGORITHM** knob | Picks the style, i.e. how the player behaves: Drift (sparse notes), Ripple (soft arpeggios), Swell (slow chords), Chime (high sparkle), Pulse (gentle rhythm) |
-| **SELECT** knob | Steps through patterns: short chord progressions or motifs the player loops or wanders through |
-| **Knob 1 — Space** | Reverb size and mix |
-| **Knob 2 — Echo** | Delay time and feedback |
-| **Knob 3 — Glow** | Brightness: how much the FM tone rings |
-| **Knob 4 — Motion** | How busy the player is, from sparse to dense; also chorus and drift on the pad |
-| **PLAY** | Starts / stops the generative player |
-| **OCT− / OCT+** | Register down / up |
-| **White keys** | The 7 chords of the current key (I, ii, iii, IV, V, vi, vii°), voiced as soft open pads; the player moves to that chord |
-| **Black keys** | Colour the held chord: sus2, add9, 7, sus4, open (repeating across the keyboard) |
-| Other buttons | Unused for now |
+| **PLAY** | Starts / stops the music |
+| **KNOB 1 — Space** | Reverb, from a small room to a huge hall |
+| **KNOB 2 — Echo** | Delay repeats |
+| **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness) |
+| **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play; chorus and drift) |
+| **White keys** | Toggle the 7 layers, lit while on (the pattern repeats across the keyboard) |
+| **Black keys** | Nudges: NEXT, HOLD, BRIGHT, DARK, HOME (the pattern repeats across the keyboard) |
+| **PRESETS** knob | The world: the sounds, the key and the tempo (a few, each complete) |
+| **ALGORITHM** knob | The behaviour: how every layer plays (DRIFT, RIPPLE, SWELL, CHIME, PULSE) |
+| **SELECT** knob | The progression: which chords the music walks through |
+| **OCT− / OCT+** | Everything an octave down / up |
+| Other buttons | Unused |
 
-Status: the chord keys, PLAY, ALGORITHM (all five styles), the four knobs and OCT work. PRESETS has one sound so
-far; SELECT (patterns) is not built yet.
+### Layers (white keys, from the left)
 
-## The player
+| Key | Layer | Sound |
+|---|---|---|
+| 1 | PAD | The chord, soft and slow (FM pad) |
+| 2 | BASS | The chord's root, low and round (sub bass) |
+| 3 | ARP | The chord's tones rippling up and down (FM bell) |
+| 4 | SPARKLE | High, quiet bell notes |
+| 5 | MELODY | Slow single notes floating in the middle |
+| 6 | CHOIR | One voice gliding between the chord's tones ("aah") |
+| 7 | SHIMMER | A high note above the pad, an octave up |
 
-PLAY starts it. It plays around the last chord the keys gave (I until a key is pressed), so changing chords while
-it runs steers it. Its notes are mostly the chord's own tones, sometimes the scale's 2nd or 6th, in the register of
-the key that set the chord. Each note is a short bell strike that rings out on its release.
+PAD and MELODY are on at power-on. The FM-1 sounds 8 voices at once across 4 parts, so the layers
+share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), CHOIR (part 4).
 
-| Style | What it plays |
+### Nudges (black keys)
+
+| Key | Nudge |
 |---|---|
-| DRIFT | Single notes, 1.4–4.6 s apart (×2 … ×0.5 with Motion) |
-| RIPPLE | An eighth-note arpeggio up and down the chord at 72 BPM; Motion sets how many notes are left out |
-| SWELL | The chord itself, re-voiced every 5–10 s and held after the keys are let go; now and then a high note |
-| CHIME | Bursts of 2–4 quick high notes, then a 2–6 s rest |
-| PULSE | A soft quarter beat at 72 BPM, the first of each bar always played and a little louder |
+| NEXT | The next chord now |
+| HOLD | Stay on this chord (lit while held) |
+| BRIGHT | Brighter chords: add9 colour, voiced higher (lit while on) |
+| DARK | Darker chords: the 7th, voiced lower (lit while on; BRIGHT and DARK exclude each other) |
+| HOME | Back to the first chord of the progression |
+
+### Behaviours (ALGORITHM)
+
+| Behaviour | Feel |
+|---|---|
+| DRIFT | Sparse and floating; chords change every 4 bars |
+| RIPPLE | Flowing eighth-note arpeggios; every 2 bars |
+| SWELL | Slow and wide, few notes; every 4 bars |
+| CHIME | Quick sixteenth figures and bursts of sparkle; every 2 bars |
+| PULSE | A soft steady beat, the bass on the quarters; every bar |
+
+### Progressions (SELECT)
+
+DRONE (one chord), HOME (I vi IV V), FLOAT (I IV), LONGING (vi IV I V), RISE (IV V iii vi),
+WANDER (moves at random between chords that fit).
+
+### Worlds (PRESETS)
+
+GLASS (D, 72 BPM, glass pad and bells), EMBER (A, 66 BPM, warm pad and electric piano), DUSK
+(F, 80 BPM, pad and wooden mallets).
 
 ## Screen
 
-One page: current sound, style, pattern and chord, and a calm animated visual. Nothing to navigate.
+One page: world, behaviour, progression, the chord now, the layers that are on, the four knobs (the biggest\nthing on it) and a calm animated visual. Nothing to navigate.
 
 ## Sound
 
@@ -67,8 +100,8 @@ One page: current sound, style, pattern and chord, and a calm animated visual. N
 
 ## Where it lives
 
-- `firmware/src/drift_play.c`: the keys → chords, and the player (runs in the audio interrupt, in place of
-  Felucca's keyboard).
+- `firmware/src/drift_play.c`: the music: the clock, progressions, layers and nudges (runs in the audio
+  interrupt, in place of Felucca's keyboard).
 - `firmware/src/drift_ui.c`: the knobs, buttons, LEDs and the one screen (in place of Felucca's UI).
 - `FELUCCA_DRIFT` (`core.h`, on by default) switches between them; `0` builds plain Felucca.
 - Felucca's sound engine (FM6, reverb, delay, chorus), USB, update loader and storage are used unchanged.
@@ -81,8 +114,9 @@ sh web/emu/build.sh                                                             
 python3 -m http.server -d build/emu 8790                                               # http://localhost:8790/
 ```
 
-To hear it without a browser, `web/emu/drift_render.c` plays a short progression, then each player style, into a
-WAV (the build command is at the top of the file; add `-DDRIFT_TRACE` to print every note the player plays).
+To hear it without a browser, `web/emu/drift_render.c` presses PLAY, adds the layers one by one, then goes through
+the behaviours, a progression and the nudges, into a WAV (the build command is at the top of the file; add
+`-DDRIFT_TRACE` to print every note struck).
 
 ## How we build it
 

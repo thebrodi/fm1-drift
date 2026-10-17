@@ -1,43 +1,69 @@
-# Felucca
+# Drift
 
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
-## Maintenance Notice
+A simple, dreamy ambient instrument: custom firmware for the M-VAVE FM-1 pocket synth.
 
-What began as a personal experiment grew far beyond my expectations. I’m grateful to everyone who contributed, supported the project, and made music with Felucca.
+Press PLAY and a gentle chord progression starts and keeps going. Add and remove layers with the white keys, nudge
+the harmony with the black keys, and shape everything live with the four knobs. Every note fits, so it always sounds
+good. No menus, no drums.
 
-I’ve decided to step back from active development to focus on creating new instruments and music.
+> **Work in progress.** Drift runs in the browser emulator. It has not been flashed to an FM-1 yet.
 
-Felucca will remain available with occasional maintenance, but new features, issue responses, and pull request reviews are not guaranteed.
+## How to play
 
-Thank you for everything. I hope you’ll look forward to my next creations.
+| Control | Does |
+|---|---|
+| **PLAY** | Starts / stops the music |
+| **KNOB 1 — Space** | Reverb, from a small room to a huge hall |
+| **KNOB 2 — Echo** | Delay repeats |
+| **KNOB 3 — Glow** | Dark and warm → bright and glassy |
+| **KNOB 4 — Motion** | Still and sparse → busy and moving |
+| **White keys** | Layers on / off (lit = playing): PAD, BASS, ARP, SPARKLE, MELODY, CHOIR, SHIMMER |
+| **Black keys** | Nudges: NEXT chord, HOLD this chord, BRIGHT, DARK, HOME |
+| **PRESETS** | The world: GLASS, EMBER, DUSK (sounds, key, tempo) |
+| **ALGORITHM** | The behaviour: DRIFT, RIPPLE, SWELL, CHIME, PULSE |
+| **SELECT** | The progression: DRONE, HOME, FLOAT, LONGING, RISE, WANDER |
+| **OCT− / OCT+** | Everything an octave down / up |
 
-## Overview
+The full design and its rules are in [DRIFT.md](DRIFT.md).
 
-Multi-engine synthesizer firmware for the M-VAVE FM-1, version 1.6.1. Connect the FM-1 to a computer by USB, open the
-[web installer](https://hugelton.github.io/Felucca/) in Chrome or Edge and press Install; no extra hardware is needed.
-Installing is at your own risk: M-VAVE's updater or the installer's **Return to official V15** takes you back.
-[Try it in your browser](https://hugelton.github.io/Felucca/webapp/try/), no FM-1 needed.
+## Try it in your browser
 
-- Install: [web installer](https://hugelton.github.io/Felucca/)
-- Edit: [web editor](https://hugelton.github.io/Felucca/webapp/editor/) ([Felucca-WebApp](https://github.com/hugelton/Felucca-WebApp))
-- Read: the manual and the release notes are in the [wiki](https://github.com/hugelton/Felucca/wiki/Home)
-- Build: [BUILDING.md](BUILDING.md)
-- Related: [Felucca-Engines](https://github.com/hugelton/Felucca-Engines) (the ANALOG, LOFI, TRIO, WHEEL and NOISE engines, MIT; still maintained) ·
-  [felucca-bsp](https://github.com/hugelton/felucca-bsp) (the FM-1 hardware layer)
+You need Python 3 with Pillow and fonttools, and [Emscripten](https://emscripten.org) (`brew install emscripten`).
 
-## AI disclaimer
+```
+python3 -c 'import sys; sys.path.insert(0,"tools"); import build; build.generate()'
+sh web/emu/build.sh
+python3 -m http.server -d build/emu 8790
+```
 
-Felucca is developed with the assistance of AI coding agents (code, tests, documentation, translation, maintenance). The
-design, features, sound design and direction are the maintainer's or the community's, and no generative AI is used for music,
-icons or artwork. See [On AI-Assisted Development and Responsibility](https://github.com/hugelton/Felucca/discussions/166).
+Then open <http://localhost:8790/> in Chrome or Edge and press **Switch on**.
+
+## Building the firmware
+
+Drift builds like Felucca: see [BUILDING.md](BUILDING.md). That needs Docker Desktop on macOS, the JieLi toolchain and
+the AC79 SDK. Installing custom firmware on an FM-1 is at your own risk. Back up first, and keep M-VAVE's updater
+(official V15) ready to go back.
+
+## Based on Felucca
+
+Drift is a fork of [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton Instruments). It replaces
+Felucca's keyboard, UI and screen with Drift's (`firmware/src/drift_play.c`, `firmware/src/drift_ui.c`) and keeps
+everything else as Felucca made it: the sound engines, effects, USB, update loader and storage. Building with
+`FELUCCA_DRIFT=0` gives plain Felucca. Felucca's own README is kept in [docs/FELUCCA.md](docs/FELUCCA.md).
 
 ## Credits and licence
 
-Free software: [GPL-3.0-only](LICENSE); the Hügelton Sample Pack is CC0 1.0; the engines in `firmware/engines` are MIT
-([Felucca-Engines](https://github.com/hugelton/Felucca-Engines)); the bundled fonts and ported DSP keep their own licences
-([LICENSES/](LICENSES/), [LICENSING.md](LICENSING.md)). Thanks to everyone whose work and contributions are in it: [CREDITS.md](CREDITS.md).
+Free software: [GPL-3.0-only](LICENSE), as Felucca. The engines in `firmware/engines` are MIT
+([Felucca-Engines](https://github.com/hugelton/Felucca-Engines)), the Hügelton Sample Pack is CC0 1.0, and the bundled
+fonts and ported DSP keep their own licences ([LICENSES/](LICENSES/), [LICENSING.md](LICENSING.md),
+[CREDITS.md](CREDITS.md)).
 
-M-VAVE and FM-1 are trademarks of their respective owners. Felucca is not affiliated with or endorsed by them.
+Drift is developed with the help of AI coding agents.
 
-Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+M-VAVE and FM-1 are trademarks of their respective owners. Drift is not affiliated with or endorsed by them, or by
+Hügelton Instruments.
+
+Felucca: Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments.
+Drift's changes: Copyright (C) 2026 Dominik Siemon.

@@ -3,80 +3,104 @@
 /* DRIFT: the panel and the screen (the main loop). With FELUCCA_DRIFT, felucca.c (and the browser build) call these in
  * place of Felucca's ui_input / ui_leds / ui_draw; Felucca's UI is still built (main.c's crash, update and UBOOT
  * screens use its drawing) but never runs. One page, no menus: every control does one thing (DRIFT.md).
- *   KNOB 1..4  SPACE (reverb), ECHO (delay), GLOW (FM brightness), MOTION (how busy the player is, chorus, drift)
- *   PLAY       the player on / off
- *   ALGORITHM  the player's style
- *   OCT- OCT+  the register, one octave down / up
- *   PRESETS    the sound (one for now)
- * The keys and the player run in the audio ISR (drift_play.c). */
+ *   PLAY       the music on / off
+ *   KNOB 1..4  SPACE (reverb), ECHO (delay), GLOW (FM brightness), MOTION (how busy; chorus and drift)
+ *   PRESETS    the world: the sounds, the key, the tempo
+ *   ALGORITHM  the behaviour of every layer
+ *   SELECT     the progression
+ *   OCT- OCT+  everything an octave down / up
+ * The keys (layers, nudges) and the music run in the audio ISR (drift_play.c). */
 
-/* -------------------------------------------------------------- sound --- */
+/* ------------------------------------------------------------ worlds --- */
 typedef struct {
     const char *name;
-    uint8_t pad_preset, bell_preset;     /* FM6 factory presets (eng_fm6.c FM6_PRESETS): PAD, BELL */
-} drift_sound_t;
-static const drift_sound_t DRIFT_SOUNDS[] = {
-    {"GLASS PAD", 4, 1},
+    uint8_t root, bpm;                   /* the key (0 = C), the tempo */
+    uint8_t pad, bell;                   /* FM6 factory presets (eng_fm6.c FM6_PRESETS) of parts 1 and 2 */
+} drift_world_t;
+static const drift_world_t DRIFT_WORLDS[] = {
+    {"GLASS", 2, 72, 4, 1},              /* D: PAD, BELL */
+    {"EMBER", 9, 66, 4, 0},              /* A: PAD, TINE EP */
+    {"DUSK", 5, 80, 4, 5},               /* F: PAD, MARIMBA */
 };
-#define DRIFT_NSOUNDS (sizeof DRIFT_SOUNDS / sizeof DRIFT_SOUNDS[0])
+#define DRIFT_NWORLDS (sizeof DRIFT_WORLDS / sizeof DRIFT_WORLDS[0])
+#define ENGI_ANALOG 0u                   /* engines.c ENGINES[] */
+#define ENGI_FORMANT 5u
+#define ANALOG_SUB_BASS 7u               /* eng_analog.c's presets */
+#define FORMANT_CHOIR 0u                 /* eng_formant.c's: CHOIR AAH */
 
 enum { DK_SPACE, DK_ECHO, DK_GLOW, DK_MOTION, DK_N };
 static const char *const DRIFT_KNOB[DK_N] = {"SPACE", "ECHO", "GLOW", "MOTION"};
 static int16_t drift_knob[DK_N] = {90, 60, 56, 50};   /* 0..127 */
-static uint8_t drift_sound, drift_ready, drift_redraw = 1;
+static uint8_t drift_world, drift_ready, drift_redraw = 1;
 
-/* the knobs -> the two parts and the effect buses */
+/* the knobs -> the parts and the effect buses */
 static void drift_apply(void)
 {
-    track_t *pad = &trk[DRIFT_PAD], *bell = &trk[DRIFT_BELL];
+    track_t *pad = &trk[DRIFT_PAD], *bell = &trk[DRIFT_BELL], *bass = &trk[DRIFT_BASS], *choir = &trk[DRIFT_CHOIR];
     int32_t sp = drift_knob[DK_SPACE], ec = drift_knob[DK_ECHO], gl = drift_knob[DK_GLOW], mo = drift_knob[DK_MOTION];
     pad->p[P_REV] = (int16_t)sp;
     bell->p[P_REV] = (int16_t)(sp + (127 - sp) / 3);
+    choir->p[P_REV] = (int16_t)(sp + (127 - sp) / 2);
+    bass->p[P_REV] = (int16_t)(sp / 4);
     song.g[G_RSIZE] = (int16_t)(60 + sp / 2);
     pad->p[P_DLY] = (int16_t)(ec / 2);
     bell->p[P_DLY] = (int16_t)ec;
+    choir->p[P_DLY] = (int16_t)(ec / 3);
     song.g[G_DFDBK] = (int16_t)(30 + ec * 3 / 5);
     pad->p[P_E0 + 2] = (int16_t)(gl - 64);               /* FM6 MLVL: the modulators' level, -64..63 */
     bell->p[P_E0 + 2] = (int16_t)(gl - 64);
     pad->p[P_CHOR] = (int16_t)mo;
+    choir->p[P_CHOR] = (int16_t)(mo / 2);
     pad->p[P_E0 + 6] = (int16_t)(mo / 2);                /* FM6 DTUN: the operators drift apart */
     pad->p[P_SPRD] = (int16_t)(40 + mo / 2);
     drift_motion = (uint8_t)mo;
 }
 
-static void drift_load(uint32_t s)
+static void drift_part(track_t *t, uint32_t engine, uint32_t preset, int16_t level, int16_t atk, int16_t sus,
+                       int16_t rel)
 {
-    const drift_sound_t *d = &DRIFT_SOUNDS[s % DRIFT_NSOUNDS];
-    track_t *pad = &trk[DRIFT_PAD], *bell = &trk[DRIFT_BELL];
-    uint32_t i;
-    drift_sound = (uint8_t)(s % DRIFT_NSOUNDS);
-    set_engine_of(pad, ENGI_FM6);
-    apply_preset_to(pad, d->pad_preset);
-    set_engine_of(bell, ENGI_FM6);
-    apply_preset_to(bell, d->bell_preset);
-    pad->p[P_VOICE] = V_POLY;
-    pad->p[P_LEVEL] = 94;
-    pad->p[P_ATK] = 72;                                  /* slow swell in, long tail out */
-    pad->p[P_DEC] = 90;
-    pad->p[P_SUS] = 112;
-    pad->p[P_REL] = 104;
-    bell->p[P_VOICE] = V_POLY;
-    bell->p[P_LEVEL] = 112;
-    bell->p[P_REL] = 100;
-    bell->p[P_PAN] = 20;
-    for (i = 2; i < NTRK; i++)                           /* the other parts are silent */
-        trk[i].p[P_MUTE] = 1;
+    set_engine_of(t, engine);
+    apply_preset_to(t, preset);
+    t->p[P_VOICE] = V_POLY;
+    t->p[P_MUTE] = 0;
+    t->p[P_LEVEL] = level;
+    t->p[P_ATK] = atk;
+    t->p[P_SUS] = sus;
+    t->p[P_REL] = rel;
+}
+
+static void drift_load(uint32_t w)
+{
+    const drift_world_t *d = &DRIFT_WORLDS[w % DRIFT_NWORLDS];
+    drift_world = (uint8_t)(w % DRIFT_NWORLDS);
+    drift_part(&trk[DRIFT_PAD], ENGI_FM6, d->pad, 102, 72, 112, 104);       /* slow swell in, long tail out */
+    trk[DRIFT_PAD].p[P_DEC] = 90;
+    drift_part(&trk[DRIFT_BELL], ENGI_FM6, d->bell, 112, 0, 127, 100);    /* struck: its own decay, a long release */
+    trk[DRIFT_BELL].p[P_PAN] = 20;
+    drift_part(&trk[DRIFT_BASS], ENGI_ANALOG, ANALOG_SUB_BASS, 88, 40, 120, 90);
+    drift_part(&trk[DRIFT_CHOIR], ENGI_FORMANT, FORMANT_CHOIR, 86, 84, 120, 100);
+    trk[DRIFT_CHOIR].p[P_GLIDE] = 40;
+    trk[DRIFT_CHOIR].p[P_PAN] = -18;
+    drift_root = d->root;
+    drift_bpm = d->bpm;
+    song.g[G_BPM] = d->bpm;                              /* (the delay's 1/4 follows it) */
     song.g[G_RTYPE] = 2;                                 /* HALL */
     song.g[G_RDAMP] = 72;
-    song.g[G_BPM] = 72;                                  /* (the delay's 1/4: 0.83 s) */
     song.g[G_DTIME] = 0;
     song.g[G_DCOLOR] = 44;                               /* darker repeats */
     song.g[G_DMIX] = 90;
     drift_apply();
+    drift_resync = 1;                                    /* (the ISR starts the held notes on the new sounds) */
     drift_redraw = 1;
 }
 
 /* ------------------------------------------------------------- input --- */
+static int32_t drift_turn(uint32_t role)                 /* a list knob: one step per turn, whatever its speed */
+{
+    int32_t s = panel_enc(role);
+    return s > 0 ? 1 : s < 0 ? -1 : 0;
+}
+
 static void drift_input(void)
 {
     uint32_t pressed = fm1_input_edges(0), i;
@@ -93,14 +117,16 @@ static void drift_input(void)
             drift_apply();
             drift_redraw = 1;
         }
-    if ((s = panel_enc(EN_PRESET)) != 0)
-        drift_load((uint32_t)((int32_t)drift_sound + s + (int32_t)DRIFT_NSOUNDS * 8));
-    if ((s = panel_enc(EN_ALGO)) != 0) {
-        int32_t v = (int32_t)drift_style + (s > 0 ? 1 : -1);
-        drift_style = (uint8_t)(v < 0 ? 0 : v >= DS_N ? DS_N - 1 : v);
+    if ((s = drift_turn(EN_PRESET)) != 0)
+        drift_load((uint32_t)((int32_t)drift_world + s + (int32_t)DRIFT_NWORLDS));
+    if ((s = drift_turn(EN_ALGO)) != 0) {
+        drift_style = (uint8_t)(((int32_t)drift_style + s + DS_N) % DS_N);
         drift_redraw = 1;
     }
-    panel_enc(EN_SELECT);                                /* (patterns: not yet) */
+    if ((s = drift_turn(EN_SELECT)) != 0) {
+        drift_prog = (uint8_t)(((int32_t)drift_prog + s + (int32_t)DP_N) % (int32_t)DP_N);
+        drift_redraw = 1;
+    }
     if ((pressed >> panel.btn[B_PLAY]) & 1u) {
         drift_run = !drift_run;
         drift_redraw = 1;
@@ -116,12 +142,21 @@ static void drift_input(void)
 }
 
 /* -------------------------------------------------------------- LEDs --- */
-/* the held keys lit, every white key glowing; OCT- / OCT+ lit while shifted */
+/* white keys: lit while their layer plays; black keys: HOLD BRIGHT DARK lit while on, NEXT and HOME flash when
+ * pressed; every key glows dimly; PLAY green while the music plays; OCT- / OCT+ lit while shifted */
 static void drift_leds(void)
 {
     uint8_t nl[FM1_NCOL] = {0}, nd[FM1_NCOL] = {0};
-    static uint8_t ready;
+    static uint8_t ready, flash;
+    static uint32_t flash_ms;
     uint32_t k, c;
+    if (drift_flash) {
+        flash = drift_flash;
+        drift_flash = 0;
+        flash_ms = fm1_ms;
+    }
+    if (flash && fm1_ms - flash_ms > 180u)
+        flash = 0;
     if (fm1_led_anim_on())
         return;
     if (!ready) {
@@ -129,16 +164,24 @@ static void drift_leds(void)
         ready = 1;
     }
     for (k = 0; k < 27u; k++) {
-        led_put(nl, 14u + k, (int)((fm1_in.notes >> k) & 1u));
-        led_put(nd, 14u + k, !key_black(k));
+        uint32_t p = key_place(k), on;
+        if (!key_black(k))
+            on = (drift_layers >> (p % DL_N)) & 1u;
+        else {
+            p %= DN_N;
+            on = (p == DN_HOLD && drift_hold) || (p == DN_BRIGHT && drift_bright) || (p == DN_DARK && drift_dark) ||
+                 (flash && p == flash - 1u);
+        }
+        led_put(nl, 14u + k, (int)on);
+        led_put(nd, 14u + k, 1);
     }
     led_put(nl, panel.btn[B_OCTDN], drift_oct < 0);
     led_put(nl, panel.btn[B_OCTUP], drift_oct > 0);
-    if (drift_run)                                       /* PLAY green while the player plays */
+    if (drift_run)
         nl[LED_PLAY_GREEN >> 3] |= (uint8_t)(1u << (LED_PLAY_GREEN & 7u));
     fm1_led_dim_level(1);
     for (c = 0; c < FM1_NCOL; c++) {
-        fm1_led_dim[c] = nd[c];
+        fm1_led_dim[c] = (uint8_t)(nd[c] & ~nl[c]);
         fm1_led_breath[c] = 0;
         fm1_led_mid[c] = 0;
         fm1_led[c] = nl[c];
@@ -146,13 +189,14 @@ static void drift_leds(void)
 }
 
 /* ------------------------------------------------------------ screen --- */
+/* top: the world, the progression, the behaviour; the chord now; the seven layers; the lights; the four knobs */
 #define D_BG RGB(12, 14, 30)
 #define D_TEXT RGB(226, 220, 255)
 #define D_MID RGB(126, 126, 178)
 #define D_DIM RGB(44, 46, 82)
 #define D_WARM RGB(255, 196, 150)
 #define D_COOL RGB(150, 190, 255)
-#define VIZ_Y 92u
+#define VIZ_Y 84u
 #define VIZ_H 84u
 
 static const char *const DRIFT_ROMAN[7] = {"I", "ii", "iii", "IV", "V", "vi", "vii"};
@@ -177,9 +221,11 @@ static void d_glow(int32_t cx, int32_t cy, int32_t r, uint16_t c, uint32_t a)
         }
 }
 
-/* the sounding voices as drifting lights: across by pitch, the height a slow wave, the size their level */
+/* the sounding voices as drifting lights: across by pitch, the height a slow wave, the size their level; each part
+ * its own colour */
 static void drift_viz(void)
 {
+    static const uint16_t COL[NPART] = {D_COOL, D_WARM, RGB(120, 110, 220), RGB(210, 170, 255)};
     static uint32_t ph;
     uint32_t p, i;
     int32_t x;
@@ -189,7 +235,7 @@ static void drift_viz(void)
         int32_t y = (int32_t)VIZ_H / 2 + (SINE[((uint32_t)x * 6u + ph * 2u) & 1023u] * 6) / 32768;
         cv_pset(x, y, D_DIM);
     }
-    for (p = 0; p < 2u; p++)
+    for (p = 0; p < NPART; p++)
         for (i = 0; i < NVOICE; i++) {
             const voice_t *v = &trk[p].v[i];
             int32_t lvl, cx, cy;
@@ -198,21 +244,31 @@ static void drift_viz(void)
             lvl = v->env_out >> 10;                      /* Q15 -> 0..32 */
             if (lvl < 1)
                 continue;
-            cx = ((int32_t)v->note - 30) * 240 / 72;
-            cy = (int32_t)VIZ_H / 2 + (SINE[(v->note * 97u + ph * (3u + p)) & 1023u] * 22) / 32768;
-            d_glow(cx, cy, 3 + lvl / 3 + (p ? 0 : 3), p ? D_WARM : D_COOL, (uint32_t)(8 + lvl * 3 / 4));
+            cx = ((int32_t)v->note - 28) * 240 / 76;
+            cy = (int32_t)VIZ_H / 2 + (SINE[(v->note * 97u + ph * (3u + p)) & 1023u] * 26) / 32768;
+            d_glow(cx, cy, 3 + lvl / 3 + (p == DRIFT_PAD ? 3 : 0), COL[p], (uint32_t)(8 + lvl * 3 / 4));
         }
     cv_blit(0, VIZ_Y);
+}
+
+static void drift_draw_layers(void)
+{
+    uint32_t i;
+    for (i = 0; i < DL_N; i++) {
+        uint32_t on = (drift_layers >> i) & 1u, x = 2u + i * 34u;
+        draw_text_line(x, 60, 34, &AF_S, DRIFT_LAYER[i], on ? D_TEXT : D_DIM, D_BG, 1);
+        lcd_fill(x + 6u, 76, 22, 2, on ? D_WARM : D_BG);
+    }
 }
 
 static void drift_draw_knobs(void)
 {
     uint32_t i;
     for (i = 0; i < DK_N; i++) {
-        uint32_t x = 8u + i * 58u, w = 50u, f = (uint32_t)drift_knob[i] * w / 127u;
-        draw_text_line(x, 190, w + 4u, &AF_S, DRIFT_KNOB[i], D_MID, D_BG, 0);
-        lcd_fill(x, 212, f, 4, D_TEXT);
-        lcd_fill(x + f, 212, w - f, 4, D_DIM);
+        uint32_t x = 6u + i * 58u, w = 54u, f = (uint32_t)drift_knob[i] * w / 127u;
+        draw_text_line(x, 182, w, &AF_S, DRIFT_KNOB[i], D_TEXT, D_BG, 1);
+        lcd_fill(x, 202, f, 10, D_WARM);
+        lcd_fill(x + f, 202, w - f, 10, D_DIM);
     }
 }
 
@@ -224,31 +280,29 @@ static void drift_draw(void)
     const char *s;
     if (drift_redraw) {
         lcd_fill(0, 0, 240, 240, D_BG);
-        draw_text_line(12, 10, 100, &AF_S, "DRIFT", D_MID, D_BG, 0);
-        draw_text_line(120, 10, 108, &AF_S, DRIFT_SOUNDS[drift_sound].name, D_TEXT, D_BG, 2);
-        draw_text_line(12, 70, 216, &AF_S, DRIFT_STYLE[drift_style], drift_run ? D_WARM : D_DIM, D_BG, 1);
-        draw_text_line(12, 226, 216, &AF_S, drift_oct < 0 ? "OCT -1" : drift_oct > 0 ? "OCT +1" : "", D_DIM, D_BG, 1);
+        draw_text_line(8, 8, 76, &AF_S, DRIFT_WORLDS[drift_world].name, D_TEXT, D_BG, 0);
+        draw_text_line(84, 8, 72, &AF_S, DRIFT_PROG[drift_prog % DP_N], D_MID, D_BG, 1);
+        draw_text_line(156, 8, 76, &AF_S, DRIFT_STYLE[drift_style % DS_N], D_MID, D_BG, 2);
+        draw_text_line(8, 222, 224, &AF_S, drift_oct < 0 ? "OCT -1" : drift_oct > 0 ? "OCT +1" : "", D_DIM, D_BG, 1);
         drift_draw_knobs();
         drift_redraw = 0;
         seen = (uint8_t)(drift_seen + 1u);
     }
-    if (seen != drift_seen) {                            /* the chord: its degree and colour */
+    if (seen != drift_seen) {                            /* the chord and the toggles */
         seen = drift_seen;
-        if (drift_deg < 0) {
-            s = drift_run ? "" : "PLAY A WHITE KEY";
-            draw_text_line(0, 40, 240, &AF_M, "", D_MID, D_BG, 1);
-            draw_text_line(0, 44, 240, &AF_S, s, D_MID, D_BG, 1);
+        if (!drift_run || drift_deg < 0) {
+            draw_text_line(0, 30, 240, &AF_M, "PRESS PLAY", D_MID, D_BG, 1);
         } else {
-            for (s = DRIFT_ROMAN[drift_deg]; *s && n < 8u; s++)
+            for (s = DRIFT_ROMAN[drift_deg % 7]; *s && n < 8u; s++)
                 b[n++] = *s;
-            if (drift_col) {
-                b[n++] = ' ';
-                for (s = DRIFT_COLOUR[drift_col]; *s && n < 20u; s++)
-                    b[n++] = *s;
-            }
+            for (s = drift_bright ? "  BRIGHT" : drift_dark ? "  DARK" : ""; *s && n < 18u; s++)
+                b[n++] = *s;
+            for (s = drift_hold ? "  HOLD" : ""; *s && n < 23u; s++)
+                b[n++] = *s;
             b[n] = 0;
-            draw_text_line(0, 40, 240, &AF_M, b, D_TEXT, D_BG, 1);
+            draw_text_line(0, 30, 240, &AF_M, b, D_TEXT, D_BG, 1);
         }
+        drift_draw_layers();
     }
     if (++frame & 1u)                                    /* the lights at ~30 frames a second */
         drift_viz();
