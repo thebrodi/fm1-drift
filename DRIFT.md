@@ -37,7 +37,7 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 | **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness, the analog pads' filter; the bells half as much) |
 | **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play: ×0.2 … ×2.2; chorus and drift) |
 | **White keys** | Toggle the 7 layers, lit while on (the pattern repeats across the keyboard) |
-| **Black keys** | Chords to jump to: press = go there, hold = stay, let go = the progression carries on |
+| **Black keys** | Chords to move to: press = go there; the chord lasts as long as TIDE's chords do (STILL: until the next press) |
 | **PRESETS** knob | The world: the sounds, the key and the tempo. Playing, a change dips out (1.5 s) and back in (2.5 s): no cut |
 | **ALGORITHM** knob | The behaviour: how every layer plays (DRIFT, RIPPLE, SWELL, CHIME, PULSE); its rhythm shown a moment |
 | **SELECT** knob | TIDE: how much the music moves by itself (STILL, CALM, FLOWING, WANDERING); shown a moment |
@@ -80,8 +80,10 @@ middle of the screen. They are Felucca's own performance effects (`perform.c`) o
 ### Chords (black keys)
 
 Every black key is a chord of the key you are in, so any of them fits at any time. Press one and the
-music moves to that chord. Hold it and the music stays there. Let go and the progression carries on
-from that chord (from its place in the progression, when the progression has it).
+music moves to that chord. It lasts as long as TIDE's chords do (CALM 4 bars, FLOWING 2, WANDERING 1),
+then the chord path carries on from there (from its place in the path, when the path has it). In
+STILL it stays until the next press: there the black keys are your chord changes. Letting go does
+nothing.
 
 | Black keys, from the left | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|
@@ -163,7 +165,7 @@ solid discs on deep navy; nothing glows.
 | Where | Shows |
 |---|---|
 | Top | The three choices: world (PRESETS), TIDE (SELECT), behaviour (ALGORITHM), over a thin line |
-| Below | The chord now (`vi`, `V add9  HELD`), or PRESS PLAY |
+| Below | The chord now (`vi`, `V add9`), or PRESS PLAY |
 | Layers | The seven layers, underlined while on |
 | Middle | The world's quiet picture, the sounding notes in it as solid discs that dim as they fade; a punch-in's name on a pill while it plays. For 2.5 s after ALGORITHM turns: its rhythm (sixteen steps for ARP, MEL and BASS, lit where they play; HALF TIME; the pad's breathing as a curve). After SELECT turns: the TIDE as water (STILL a flat line, CALM long swells, FLOWING rolling waves, WANDERING choppy ones), the chords of its path riding on it (the one now lit, its numeral under it), and over FLOWING and WANDERING a few small lights rising and sinking: the layers that come and go |
 | Knobs | SPACE, ECHO, GLOW, MOTION: a rounded bar in each knob's colour, and the value |

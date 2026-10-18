@@ -799,8 +799,6 @@ static void drift_draw_chord(void)
             b[n++] = *s;
         for (s = drift_bright ? " add9" : ""; *s; s++)
             b[n++] = *s;
-        for (s = drift_pin != 0xFF ? "  HELD" : ""; *s; s++)
-            b[n++] = *s;
         b[n] = 0;
         draw_text_line(0, 34, 240, &AF_M, b, D_TEXT, D_BG, 1);
     }

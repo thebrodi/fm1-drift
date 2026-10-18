@@ -4,8 +4,8 @@
  * Included by seq.c with FELUCCA_DRIFT. DRIFT.md has the design.
  *   PLAY: a chord progression (SELECT) walks on by itself on a sixteenth-note clock at the world's tempo.
  *   White keys: toggle the seven layers (PAD BASS ARP SPARKLE MELODY CHOIR SHIMMER), repeating across the keyboard.
- *   Black keys: chords to jump to (vi ii IV V I from the left; the upper ones the same chords, add9): pressed, the music
- *   moves there; held, it stays; let go, the progression carries on from there.
+ *   Black keys: chords to jump to (vi ii IV V I from the left; the upper ones the same chords, coloured): pressed, the
+ *   music moves there, for as long as TIDE's chords last (STILL: until the next), then its path carries on from there.
  *   ALGORITHM: how every layer behaves (DS_*: how long a chord lasts, how often each layer plays).
  *   FX SCL ENV LFO EDIT GLO: punch-in effects on the whole sound while held (Felucca's perform.c effects, on the master):
  *   ECHOES (ECHO THROW), STUTTER (REPEAT 1/16), FREEZE, SHIMMER (OCT UP), UNDERWATER (the LPF sweeping down over a bar,
@@ -104,7 +104,6 @@ static volatile uint8_t drift_bpm = 72;  /* the world's tempo */
 static volatile uint8_t drift_resync;    /* the UI reloaded the parts' sounds: start the held notes again */
 static volatile uint8_t drift_layers = 1u << DL_PAD | 1u << DL_MELODY;   /* the layers on (bit DL_*) */
 static volatile uint8_t drift_bright;    /* the chord now is the add9 one (an upper black key chose it) */
-static volatile uint8_t drift_pin = 0xFF;   /* the black key (its place) holding the chord, 0xFF none */
 static volatile uint8_t drift_act[DL_N]; /* each layer's activity: 255 as it plays a note, the screen lets it fade */
 static volatile int8_t drift_deg = -1;   /* the chord sounding (0..6), -1 none: the screen shows it */
 static volatile uint8_t drift_seen;      /* bumped when the chord or a toggle changes (the screen redraws) */
@@ -366,25 +365,10 @@ static void drift_jump(int32_t d, uint32_t bright)
 /* --------------------------------------------------------------- keys --- */
 static uint32_t drift_keys;              /* the keys as the last block saw them */
 
-/* 1 = the black key at place p is held */
-static int drift_black_held(uint32_t keys, uint32_t p)
-{
-    uint32_t k;
-    for (k = 0; k < 27u; k++)
-        if (((keys >> k) & 1u) && key_black(k) && key_place(k) == p)
-            return 1;
-    return 0;
-}
-
 static void drift_keys_block(void)
 {
     uint32_t cur = fm1_in.notes, down = cur & ~drift_keys, k;
     drift_keys = cur;
-    if (drift_pin != 0xFF && !drift_black_held(cur, drift_pin)) {   /* let go: the chord lasts its length from now */
-        drift_pin = 0xFF;
-        drift_since = drift_tick;
-        drift_seen++;
-    }
     for (k = 0; down && k < 27u; k++) {
         uint32_t p;
         if (!((down >> k) & 1u))
@@ -393,8 +377,7 @@ static void drift_keys_block(void)
         if (!key_black(k)) {                             /* a layer on / off */
             drift_layers ^= (uint8_t)(1u << (p % DL_N));
             drift_voice_held();
-        } else if (drift_on) {                          /* a chord: there now, and held while the key is */
-            drift_pin = (uint8_t)p;
+        } else if (drift_on) {                          /* a chord: there now, for as long as TIDE's chords last */
             drift_jump(DRIFT_BLACK[drift_minor & 1u][p % 5u], p >= 5u);
         }
         drift_seen++;
@@ -559,7 +542,7 @@ static void drift_sixteenth(void)
     const drift_beh_t *b = &DRIFT_BEH[drift_style % DS_N];
     int32_t lo = drift_lo(), st[3];
     uint32_t q = drift_tick % 16u, L, bars = TIDE_BARS[drift_tide % DT_N];
-    if (bars && q == 0u && drift_pin == 0xFF && drift_tick - drift_since >= 16u * bars) {   /* the next chord */
+    if (bars && q == 0u && drift_tick - drift_since >= 16u * bars) {   /* the next chord */
         drift_advance();
         drift_voice_held();
     }
@@ -636,7 +619,6 @@ static void drift_player(uint32_t n)
         drift_was_run = drift_on;
         drift_tick = 0;
         drift_clock = 0;
-        drift_pin = 0xFF;
         drift_mel_wait = 2;
         drift_mel_burst = 0;
         drift_choir_wait = 0;

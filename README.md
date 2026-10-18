@@ -30,7 +30,7 @@ If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelto
 | **KNOB 3 — Glow** | Dark and warm → bright and glassy |
 | **KNOB 4 — Motion** | Still and sparse → busy and moving |
 | **White keys** | Layers on / off (lit = playing): PAD, BASS, ARP, SPARKLE, MELODY, VOX, SHIMMER |
-| **Black keys** | Chords to jump to (vi ii IV V I, then the same with add9): press to go, hold to stay, let go to carry on |
+| **Black keys** | Chords to move to (vi ii IV V I, then the same with a soft colour): press to go there |
 | **PRESETS** | The world: GLASS, EMBER, DUSK, NIGHT, NEON, LOFI, BOWLS, GARDEN, FOREST, OCEAN, RAIN, CAVE, HANDPAN, CRYSTAL |
 | **ALGORITHM** | The behaviour: DRIFT, RIPPLE, SWELL, CHIME, PULSE |
 | **SELECT** | TIDE, how much it moves by itself: STILL, CALM, FLOWING (layers come and go now and then), WANDERING |
