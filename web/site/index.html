@@ -1,115 +1,528 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-only
      Copyright (C) 2026 Dominik Siemon
-     Haave's website: this page, the browser emulator (try/) and the web installer (install/), put together by
-     tools/make_haave_site.py into build/site for GitHub Pages. -->
+     Haave's website: this page, the browser emulator (try/) and the install page (install/), put together by
+     tools/make_haave_site.py into build/site for GitHub Pages. The pictures in img/ are the instrument's own screen,
+     recorded from the firmware by tools/make_haave_shots.py (web/emu/haave_shots.c); the font is the screen's,
+     Inter Tight (fonts/, SIL OFL 1.1). -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Haave</title>
 <meta name="description" content="Haave: simple, dreamy ambient firmware for the M-VAVE FM-1, made for live meditation.">
+<meta name="theme-color" content="#0e1124">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%230e1124'/%3E%3Ccircle cx='8' cy='8' r='4' fill='%2385b7eb'/%3E%3C/svg%3E">
 <style>
+  @font-face { font-family: "Inter Tight"; src: url("fonts/InterTight.woff") format("woff");
+               font-weight: 100 900; font-display: swap; }
   :root {
-    --bg: #0e1124; --panel: #151936; --line: #2a2d55; --text: #e6e2ff; --mid: #9a9ad0; --dim: #5a5e96;
-    --sky: #85b7eb; --lilac: #afa9ec; --rose: #ed93b1; --mint: #9fe1cb; --peach: #f5c4b3;
+    --bg: #0e1124; --panel: #151936; --panel2: #1c2046; --line: #2a2d55; --deep: #343862;
+    --text: #e6e2ff; --mid: #9a9ad0; --dim: #5a5e96;
+    --sky: #85b7eb; --lilac: #afa9ec; --rose: #ed93b1; --mint: #9fe1cb; --peach: #f5c4b3; --violet: #7f77dd;
   }
   * { box-sizing: border-box; }
-  html { background: var(--bg); }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 56px 20px 72px; }
-  h1 { font-size: 64px; font-weight: 600; letter-spacing: 0.08em; margin: 0; }
-  h2 { font-size: 20px; font-weight: 600; margin: 56px 0 12px; color: var(--lilac); letter-spacing: 0.04em; }
-  p { margin: 0 0 14px; }
+  html { background: var(--bg); scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 17px/1.65 "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif; }
   a { color: var(--sky); }
-  .tag { color: var(--mid); font-size: 19px; margin: 4px 0 28px; }
-  .orb { width: 92px; height: 92px; border-radius: 50%; margin-bottom: 18px;
-         background: radial-gradient(circle at 40% 38%, #c9e2ff 0%, var(--sky) 30%, rgba(133,183,235,0) 70%); }
-  .buttons { display: flex; gap: 12px; flex-wrap: wrap; margin: 26px 0 8px; }
-  .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600;
+  img { display: block; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+  /* the top line, like the screen's: three words and a rule */
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 0 10px;
+         border-bottom: 1px solid var(--line); font-size: 14px; letter-spacing: .14em; text-transform: uppercase; }
+  .top b { font-weight: 600; letter-spacing: .22em; }
+  .top nav { display: flex; gap: 20px; flex-wrap: wrap; justify-content: flex-end; }
+  .top nav a { color: var(--mid); text-decoration: none; }
+  .top nav a:hover { color: var(--text); }
+
+  /* hero */
+  .hero { display: grid; grid-template-columns: 1fr auto; gap: 48px; align-items: center; padding: 56px 0 40px; }
+  h1 { font-size: 88px; line-height: 1; font-weight: 600; letter-spacing: .14em; margin: 0 0 14px; }
+  .tag { color: var(--mid); font-size: 20px; margin: 0 0 26px; }
+  .tag i { color: var(--peach); font-style: normal; }
+  .lead { margin: 0 0 14px; max-width: 34em; }
+  .buttons { display: flex; gap: 12px; flex-wrap: wrap; margin: 28px 0 10px; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 12px; text-decoration: none; font-weight: 600;
          border: 1px solid var(--line); color: var(--text); background: var(--panel); }
-  .btn.primary { background: var(--mint); color: #0e1124; border-color: var(--mint); }
+  .btn:hover { border-color: var(--deep); background: var(--panel2); }
+  .btn.primary { background: var(--mint); color: var(--bg); border-color: var(--mint); }
+  .btn.primary:hover { background: #b7ecd9; }
   .note { color: var(--mid); font-size: 15px; }
-  table { width: 100%; border-collapse: collapse; font-size: 15px; }
-  td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-  td:first-child { color: var(--peach); white-space: nowrap; font-weight: 600; padding-right: 18px; }
-  .worlds { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
-  .world { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; }
-  .world b { display: block; color: var(--text); letter-spacing: 0.06em; }
-  .world span { color: var(--mid); }
-  .warn { border-left: 3px solid var(--rose); padding: 4px 0 4px 14px; color: var(--mid); font-size: 15px; }
-  footer { color: var(--dim); font-size: 13px; margin-top: 64px; line-height: 1.6; }
+  .device { background: #090b1c; border: 1px solid var(--line); border-radius: 26px; padding: 18px; }
+  .device img { width: 480px; max-width: 100%; height: auto; border-radius: 6px; image-rendering: pixelated; }
+  .device p { margin: 12px 4px 0; font-size: 13px; color: var(--dim); letter-spacing: .04em; }
+
+  /* three points */
+  .points { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 8px 0 0; }
+  .point { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; }
+  .point svg { display: block; margin-bottom: 10px; }
+  .point b { display: block; font-weight: 600; letter-spacing: .04em; }
+  .point span { color: var(--mid); font-size: 15px; }
+
+  /* sections: a header like the screen's */
+  section { padding: 64px 0 0; }
+  .hd { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line);
+        padding-bottom: 8px; margin-bottom: 24px; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; }
+  .hd h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--lilac); letter-spacing: .16em; }
+  .hd span { color: var(--dim); }
+  .prose { max-width: 40em; }
+  .prose p { margin: 0 0 14px; }
+
+  /* how to play: the FM-1, its screen, the card and the steps */
+  .fm1 { position: relative; max-width: 940px; margin: 0 auto; }
+  .below { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start;
+           margin-top: 22px; }
+  .fm1 svg { width: 100%; height: auto; display: block; touch-action: manipulation; }
+  .fm1 .scr { position: absolute; left: calc(222 / 820 * 100%); top: calc(22 / 520 * 100%);
+              width: calc(200 / 820 * 100%); height: auto; aspect-ratio: 1; border-radius: 1.2%; pointer-events: none; }
+  .ctl { cursor: pointer; outline: none; }
+  .ctl .face { fill: #1f2349; stroke: #33386a; stroke-width: 1.5; transition: fill .15s, stroke .15s; }
+  .ctl .knob { fill: #0b0d20; }
+  .ctl .slit { opacity: .55; transition: opacity .15s; }
+  .ctl:hover .face, .ctl:focus-visible .face { stroke: var(--mid); }
+  .ctl.on .face { stroke: var(--mint); stroke-width: 2.5; }
+  .ctl.on .slit { opacity: 1; }
+  .ctl.sel .face { fill: #2b3064; stroke: var(--text); stroke-width: 2.5; }
+  .ctl.sel .slit { opacity: 1; }
+  .lbl { fill: var(--mid); font-size: 11.5px; letter-spacing: .06em; pointer-events: none; }
+  .ctl.on .lbl, .ctl.sel .lbl { fill: var(--text); }
+  .klbl { fill: var(--dim); font-size: 9.5px; letter-spacing: .02em; pointer-events: none; }
+  .ctl.on .klbl, .ctl.sel .klbl { fill: var(--text); }
+  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin: 12px 4px 0; font-size: 14px;
+            color: var(--mid); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px 22px 18px; }
+  .card .grp { font-size: 13px; letter-spacing: .16em; text-transform: uppercase; font-weight: 600; }
+  .card h3 { font-size: 26px; font-weight: 600; letter-spacing: .04em; margin: 4px 0 8px; }
+  .card p { margin: 0 0 12px; }
+  .card .on-screen { color: var(--dim); font-size: 14px; margin: 0; }
+  .card .big { display: none; width: 100%; height: auto; aspect-ratio: 1; border-radius: 10px; margin: 0 0 16px; }
+  .steps { margin-top: 0; }
+  .steps ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .steps button { font: inherit; font-size: 14px; color: var(--mid); background: transparent; border: 1px solid var(--line);
+                  border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+  .steps button:hover { color: var(--text); border-color: var(--deep); }
+  .steps button[aria-current="step"] { background: var(--mint); color: var(--bg); border-color: var(--mint); font-weight: 600; }
+  .stepnav { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; gap: 12px; }
+  .stepnav button { font: inherit; font-weight: 600; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+                    border-radius: 12px; padding: 9px 18px; cursor: pointer; }
+  .stepnav button:hover { border-color: var(--deep); }
+  .stepnav button:disabled { opacity: .35; cursor: default; }
+  .stepnav span { color: var(--dim); font-size: 14px; }
+  .hint { color: var(--dim); font-size: 14px; margin: 10px 0 0; }
+
+  /* worlds */
+  .worlds { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  .world { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+           cursor: pointer; outline: none; transition: border-color .15s, transform .15s; }
+  .world:hover, .world:focus-visible, .world.live { border-color: var(--deep); transform: translateY(-2px); }
+  .world img { width: 100%; height: auto; aspect-ratio: 240 / 88; background: #0e1124; }
+  .world figcaption { padding: 12px 16px 14px; border-top: 1px solid var(--line); }
+  .world b { display: flex; justify-content: space-between; align-items: baseline; font-weight: 600; letter-spacing: .1em; }
+  .world b small { font-size: 13px; letter-spacing: .04em; font-weight: 500; }
+  .world span { color: var(--mid); font-size: 15px; }
+
+  /* installing */
+  .soon { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: start; background: var(--panel);
+          border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+  .soon .pill { background: var(--deep); color: var(--text); border-radius: 999px; padding: 4px 14px; font-size: 13px;
+                font-weight: 600; letter-spacing: .14em; white-space: nowrap; }
+  .soon p { margin: 0 0 10px; }
+  .warn { border-left: 3px solid var(--rose); padding: 2px 0 2px 14px; color: var(--mid); font-size: 15px; margin-top: 18px; }
+
+  footer { color: var(--dim); font-size: 13px; line-height: 1.7; margin: 72px 0 0; padding: 18px 0 48px;
+           border-top: 1px solid var(--line); }
   footer a { color: var(--mid); }
-  @media (max-width: 520px) { h1 { font-size: 46px; } main { padding-top: 36px; } td:first-child { white-space: normal; } }
+
+  @media (max-width: 960px) {
+    .hero { grid-template-columns: 1fr; gap: 32px; padding-top: 40px; }
+    .device { justify-self: center; }
+    .below { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    body { font-size: 16px; }
+    h1 { font-size: 60px; }
+    .tag { font-size: 18px; }
+    .points { grid-template-columns: 1fr; }
+    .top nav { gap: 14px; }
+    .top nav .wide { display: none; }
+    .device { padding: 12px; border-radius: 20px; }
+    .soon { grid-template-columns: 1fr; }
+    .card .big { display: block; }                       /* (the panel's screen is small here: a big one in the card) */
+    .steps ol { display: none; }
+  }
+  @media (max-width: 999px) { .device img { image-rendering: auto; } }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .world, .ctl .face { transition: none; } }
 </style>
 </head>
 <body>
-<main>
-  <div class="orb" aria-hidden="true"></div>
-  <h1>HAAVE</h1>
-  <p class="tag">Dream firmware for the M-VAVE FM-1 · <i>haave</i>, Finnish for a daydream, a reverie</p>
+<div class="wrap">
+  <header class="top">
+    <b>Haave</b>
+    <nav aria-label="Sections">
+      <a href="#play">How to play</a><a href="#worlds">Worlds</a><a class="wide" href="#install">Install</a>
+      <a href="try/">Try it</a>
+    </nav>
+  </header>
 
-  <p>Haave turns the FM-1 into a small, simple instrument for dreamy, ambient, meditative music. Press PLAY and a gentle
-  chord progression starts and keeps going by itself. Add and remove layers with the white keys, move the harmony with
-  the black keys, and shape the sound live with four knobs. Every note fits, so it always sounds good. No menus, no
-  drums.</p>
-  <p>I'm not a music expert, and Haave isn't meant to be a full synthesizer. It deliberately limits what the FM-1 can do,
-  so all that's left is playing melodic, drifting sounds. I use it for live meditation, together with my singing bowls.</p>
-
-  <div class="buttons">
-    <a class="btn primary" href="try/">Try it in your browser</a>
-    <a class="btn" href="install/">Install on your FM-1</a>
-    <a class="btn" href="https://github.com/thebrodi/fm1-haave">Source</a>
-  </div>
-  <p class="note">The browser version runs the same code as the instrument, with sound. Chrome or Edge recommended.</p>
-
-  <h2>HOW TO PLAY</h2>
-  <table>
-    <tr><td>PLAY</td><td>Starts and stops the music. Everything begins here (it breathes while stopped).</td></tr>
-    <tr><td>KNOB 1–4</td><td>Space, Echo, Glow, Motion: how far away, the echoes, dark or bright, and how much it moves. The main way to play live.</td></tr>
-    <tr><td>White keys 1–7</td><td>Layers on and off, lit while playing: pad, bass, arpeggio, sparkle, melody, voice, shimmer.</td></tr>
-    <tr><td>White keys 8–16</td><td>Play along: a deep gong, a held bass, then seven notes of the chord going up. Never a wrong note.</td></tr>
-    <tr><td>Black keys</td><td>Chords to move to. Press one and the music goes there; on STILL it stays until your next chord.</td></tr>
-    <tr><td>PRESETS</td><td>The world: sounds, key, tempo and room.</td></tr>
-    <tr><td>ALGORITHM</td><td>The behaviour: drift, ripple, swell, chime or pulse.</td></tr>
-    <tr><td>SELECT</td><td>Tide: how much it moves by itself, from still (one chord) to wandering (chords and layers come and go). Made for long, calm sessions.</td></tr>
-    <tr><td>OCT − / +</td><td>Everything an octave down or up.</td></tr>
-    <tr><td>FX … GLO</td><td>Punch-in effects while held, like a DJ, on the beat: echoes, stutter, freeze, shimmer, underwater, wash.</td></tr>
-    <tr><td>HOME … SEQ</td><td>Moments, one press each: home (land on the first chord with a gong), breathe, cascade, swell. Each plays out and gives the music back.</td></tr>
-  </table>
-
-  <h2>WORLDS</h2>
-  <div class="worlds">
-    <div class="world"><b>GLASS</b><span>Glass pad and bells, D major</span></div>
-    <div class="world"><b>EMBER</b><span>Warm strings and electric piano, A major</span></div>
-    <div class="world"><b>DUSK</b><span>Cloud pad and wooden mallets, F major</span></div>
-    <div class="world"><b>NIGHT</b><span>Dark pad and a whisper, E minor</span></div>
-    <div class="world"><b>NEON</b><span>80s strings and a crystal bell, G major</span></div>
-    <div class="world"><b>LOFI</b><span>Soft pad and mellow keys, E♭ major</span></div>
-    <div class="world"><b>BOWLS</b><span>Singing bowl over a warm drone, C minor</span></div>
-    <div class="world"><b>GARDEN</b><span>Kalimba and shimmer, A major</span></div>
-    <div class="world"><b>FOREST</b><span>Soft flute in the mist, E minor</span></div>
-    <div class="world"><b>OCEAN</b><span>Brown-noise waves and a low bell, D major</span></div>
-    <div class="world"><b>RAIN</b><span>Soft rain, a kalimba and a hum, E minor</span></div>
-    <div class="world"><b>CAVE</b><span>A deep pad and a low choir, A minor</span></div>
-    <div class="world"><b>HANDPAN</b><span>Handpan over a warm drone, D minor</span></div>
-    <div class="world"><b>CRYSTAL</b><span>Crystal singing bowls in the air, C major</span></div>
+  <div class="hero">
+    <div>
+      <h1>HAAVE</h1>
+      <p class="tag">Dream firmware for the M-VAVE FM-1 · <i>haave</i>: Finnish for a daydream, a reverie</p>
+      <p class="lead">Haave turns the FM-1 into a small, simple instrument for dreamy, ambient, meditative music. Press
+      PLAY and a gentle chord progression starts and keeps going by itself. Add and remove layers, move the harmony,
+      play along, and shape the sound live with four knobs. Every note fits, so it always sounds good. No menus, no
+      drums.</p>
+      <div class="buttons">
+        <a class="btn primary" href="try/">Try it in your browser</a>
+        <a class="btn" href="#install">Install on your FM-1</a>
+        <a class="btn" href="https://github.com/thebrodi/fm1-haave">Source</a>
+      </div>
+      <p class="note">The browser version runs the same code as the instrument, with sound. Chrome or Edge recommended.</p>
+    </div>
+    <figure class="device" style="margin:0">
+      <picture>
+        <source srcset="img/heros.webp" media="(prefers-reduced-motion: reduce)">
+        <img src="img/hero.webp" width="480" height="480" alt="Haave's screen while GLASS plays: the chord, the layers,
+          notes drifting around an orbit, and the four knobs">
+      </picture>
+      <p>The real screen, recorded from the firmware: GLASS playing.</p>
+    </figure>
   </div>
 
-  <h2>INSTALLING</h2>
-  <p>Connect the FM-1 by USB, open the <a href="install/">installer</a> in Chrome or Edge and press Install. Nothing else
-  is needed. The installer can also take you back to M-VAVE's official firmware (V15) at any time.</p>
-  <p class="warn">Installing custom firmware is at your own risk. Haave is young and has had little testing on real
-  devices. Keep M-VAVE's official V15 firmware file ready before you install.</p>
+  <div class="points">
+    <div class="point">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="13" fill="#9fe1cb"/></svg>
+      <b>Press PLAY</b><span>The music starts and keeps going by itself. You join in when you like.</span>
+    </div>
+    <div class="point">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="3" y="6" width="28" height="5" rx="2.5" fill="#afa9ec"/><rect x="3" y="14.5" width="20" height="5" rx="2.5" fill="#afa9ec"/><rect x="3" y="23" width="24" height="5" rx="2.5" fill="#afa9ec"/></svg>
+      <b>Every note fits</b><span>Chords, layers and the keys you play always harmonise. There are no wrong notes.</span>
+    </div>
+    <div class="point">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="12" fill="none" stroke="#85b7eb" stroke-width="5"/></svg>
+      <b>Made for stillness</b><span>For live meditation with singing bowls: slow, soft, with nothing to get lost in.</span>
+    </div>
+  </div>
+
+  <section id="why">
+    <div class="hd"><h2>Why</h2><span>01</span></div>
+    <div class="prose">
+      <p>I'm not a music expert, and Haave isn't meant to be a full synthesizer. It deliberately limits what the FM-1
+      can do: fewer functions and fewer options, so all that's left is playing melodic, dreamy, drifting sounds. I use
+      it for live meditation, together with my singing bowls: slow, soft and relaxing, with nothing to get lost in.</p>
+      <p>If you want everything the FM-1 can do, use <a href="https://github.com/hugelton/Felucca">Felucca</a>, which
+      Haave is built on.</p>
+    </div>
+  </section>
+
+  <section id="play">
+    <div class="hd"><h2>How to play</h2><span>02</span></div>
+    <div class="play">
+      <div>
+        <div class="fm1">
+          <svg id="fm1" viewBox="0 0 820 520" role="group" aria-label="The FM-1's panel: choose a control to see what it does"></svg>
+          <img class="scr" id="scr" src="img/play.webp" alt="" width="240" height="240">
+        </div>
+        <div class="legend" aria-hidden="true">
+          <span><i style="background:var(--sky)"></i>Layers</span>
+          <span><i style="background:var(--peach)"></i>Gong and bass</span>
+          <span><i style="background:var(--lilac)"></i>Play along</span>
+          <span><i style="background:var(--rose)"></i>Chords</span>
+        </div>
+      </div>
+      <div class="below">
+        <div class="card" aria-live="polite">
+          <img class="big" id="scr-big" src="img/play.webp" alt="" width="240" height="240">
+          <div class="grp" id="c-grp"></div>
+          <h3 id="c-title"></h3>
+          <p id="c-text"></p>
+          <p class="on-screen" id="c-screen"></p>
+        </div>
+        <div>
+        <nav class="steps" aria-label="A first session, step by step">
+          <ol id="steps"></ol>
+          <div class="stepnav">
+            <button type="button" id="back">Back</button>
+            <span id="where"></span>
+            <button type="button" id="next">Next</button>
+          </div>
+        </nav>
+        <p class="hint">Go through the steps, or tap any control on the FM-1.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="worlds">
+    <div class="hd"><h2>Worlds</h2><span>03</span></div>
+    <p class="prose" style="margin:0 0 20px">Fourteen worlds, each with its own sounds, key, tempo, room and picture.
+    Turn PRESETS to change world; the music dips out and comes back in the new one. Point at a world, or tap it, to
+    see its picture move.</p>
+    <div class="worlds" id="world-grid"></div>
+  </section>
+
+  <section id="install">
+    <div class="hd"><h2>Installing</h2><span>04</span></div>
+    <div class="soon">
+      <span class="pill">COMING SOON</span>
+      <div>
+        <p>Haave isn't released for everyone yet. It runs on my own FM-1, and here in your
+        <a href="try/">browser</a>.</p>
+        <p>Once it's released, you'll connect the FM-1 by USB, open the installer in Chrome or Edge and press Install.
+        Nothing else will be needed, and the same installer can take you back to M-VAVE's official firmware (V15) at any
+        time.</p>
+      </div>
+    </div>
+    <p class="warn">Installing custom firmware is at your own risk. Haave is young and has had little testing on real
+    devices. Keep M-VAVE's official V15 firmware file ready before you install.</p>
+  </section>
 
   <footer>
     Haave is free software under the <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0</a>, built on
     <a href="https://github.com/hugelton/Felucca">Felucca</a> by Leo Kuroshita (Hügelton Instruments), whose sound
     engines, effects, USB, update loader and installer it keeps. The browser version follows charlesvestal's
-    <a href="https://github.com/charlesvestal/fm1-x0x">X0X</a>.<br>
+    <a href="https://github.com/charlesvestal/fm1-x0x">X0X</a>. The pictures are Haave's own screen; the font is
+    <a href="fonts/OFL.txt">Inter Tight</a> (SIL OFL 1.1).<br>
     M-VAVE and FM-1 are trademarks of their respective owners. Haave is not affiliated with or endorsed by them, or by
     Hügelton Instruments.
   </footer>
-</main>
+</div>
+
+<script>
+"use strict";
+const C = { sky: "#85b7eb", peach: "#f5c4b3", lilac: "#afa9ec", rose: "#ed93b1", mint: "#9fe1cb", violet: "#7f77dd",
+            mid: "#9a9ad0", dim: "#5a5e96" };
+
+/* ---- what each control does (haave_ui.c / haave_play.c; HAAVE.md) ---- */
+const SCREEN = {
+  play: "On the screen: PRESS PLAY, then the music.",
+  knobs: "On the screen: the four knobs' bars, at the bottom.",
+  layers: "On the screen: the layers light up as they join.",
+  chords: "On the screen: the chord sounding now, at the top.",
+  playkeys: "On the screen: your notes, as lights in the picture.",
+  presets: "On the screen: the world's name and its picture.",
+  algo: "On the screen: the behaviour's rhythm, for a moment.",
+  tide: "On the screen: the tide as water, its chords riding on it.",
+  punch: "On the screen: the effect's name while it plays.",
+  moments: "On the screen: the moment's name while it plays.",
+  hero: "On the screen: the music playing."
+};
+const LAYERS = [
+  ["PAD", "The chord, soft and slow."], ["BASS", "The chord's root, low and round."],
+  ["ARP", "The chord's notes rippling up and down."], ["SPARK", "High, quiet bell notes, now and then."],
+  ["MEL", "Slow single notes floating in the middle."], ["VOX", "One voice gliding between the chord's notes."],
+  ["SHIM", "A high note shining above the pad."]
+];
+const PUNCH = [["FX", "ECHOES", "Everything thrown into the echo, the repeats lifted."],
+  ["SCL", "STUTTER", "The last sixteenth repeats."], ["ENV", "FREEZE", "The moment holds still."],
+  ["LFO", "SHIMMER", "An octave up, glittering."], ["EDIT", "UNDERWATER", "Everything dark and far away."],
+  ["GLO", "WASH", "Everything into the reverb, a wash of sound."]];
+const MOMENT = [["HOME", "HOME", "Back to the first chord, landing with the gong."],
+  ["SAVE", "BREATHE", "Only the pad for two bars, a little darker; then everything returns."],
+  ["ARP", "CASCADE", "Nine bell notes falling down the chord."],
+  ["SEQ", "SWELL", "The layers join one by one and it opens up, then settles back as it was."]];
+const CTL = {};
+function def(id, grp, col, title, text, scene) { CTL[id] = { grp, col, title, text, scene }; }
+def("play", "Start", C.mint, "PLAY", "Starts and stops the music. A slow chord progression begins and keeps going by itself. While stopped, PLAY breathes, so you know where to start.", "play");
+def("k1", "Knob 1", C.sky, "SPACE", "How far away: from close and dry to a vast hall. Turning it up moves the music away rather than making it louder.", "knobs");
+def("k2", "Knob 2", C.lilac, "ECHO", "Echoes, from none to long, repeating trails.", "knobs");
+def("k3", "Knob 3", C.rose, "GLOW", "Dark and warm, or bright and glassy. The reverb and echoes follow it.", "knobs");
+def("k4", "Knob 4", C.mint, "MOTION", "Still and sparse, or busy and moving: more notes, and a pad that sways and breathes deeper.", "knobs");
+def("master", "Volume", C.peach, "MASTER", "The volume. Haave starts and stops without fades on purpose, so you fade in and out by hand, as slowly as the moment needs.", "hero");
+def("presets", "The world", C.peach, "PRESETS", "Chooses the world: its sounds, key, tempo and room. Turned while playing, the music dips out and comes back in the new world, without a cut.", "presets");
+def("algo", "The behaviour", C.lilac, "ALGORITHM", "How every layer plays: DRIFT, RIPPLE, SWELL, CHIME or PULSE. Each has its own rhythm, which the screen shows for a moment.", "algo");
+def("select", "The tide", C.sky, "SELECT: TIDE", "How much the music moves by itself. STILL holds one chord until you choose another. CALM changes chord every four bars, FLOWING every two, and layers come and go. WANDERING goes anywhere, every bar.", "tide");
+def("oct", "Register", C.mid, "OCT − / OCT +", "Everything an octave down or up. Both lit means shifted.", "hero");
+def("rec", "Not used", C.dim, "REC", "Haave leaves REC alone.", "hero");
+LAYERS.forEach(([n, t], i) => def("l" + i, "White key " + (i + 1) + " · a layer", C.sky, n === "SPARK" ? "SPARKLE" : n === "MEL" ? "MELODY" : n === "SHIM" ? "SHIMMER" : n,
+  t + " Press to switch it on or off; lit while it plays.", "layers"));
+def("gong", "White key 8 · play along", C.peach, "GONG", "A deep strike of the world's bell on the chord's root, its octave softly above.", "playkeys");
+def("bass", "White key 9 · play along", C.peach, "BASS", "The chord's root on the bass, for as long as you hold the key. It follows the chords.", "playkeys");
+for (let i = 0; i < 7; i++)
+  def("p" + i, "White key " + (10 + i) + " · play along", C.lilac, "NOTE " + (i + 1), "The notes of the chord sounding now, going up from the left. Whatever you press fits, and when the chord changes the same keys play the new one.", "playkeys");
+for (let i = 0; i < 11; i++)
+  def("b" + i, "Black key " + (i + 1) + " · a chord", C.rose, i < 5 ? "CHORD" : "CHORD, COLOURED",
+    (i < 5 ? "A chord to move to. " : "The same chords as on the left, with a soft colour (a ninth, or a seventh on minor chords). ") +
+    "Press one and the music goes there; the lit one sounds now. On STILL it stays until your next chord.", "chords");
+PUNCH.forEach(([b, n, t]) => def(b.toLowerCase(), "Punch-in · hold " + b, C.mint, n, t + " Hold for the effect, let go and it's gone; it waits for the beat.", "punch"));
+MOMENT.forEach(([b, n, t]) => def("m" + b.toLowerCase(), "Moment · press " + b, C.violet, n, t + " One press, from the next beat; it plays itself out.", "moments"));
+
+const STEPS = [
+  ["Press PLAY", ["play"], "play"],
+  ["Shape it with the knobs", ["k1", "k2", "k3", "k4"], "knobs"],
+  ["Add and remove layers", ["l0", "l1", "l2", "l3", "l4", "l5", "l6"], "layers"],
+  ["Move the harmony", ["b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10"], "chords"],
+  ["Play along", ["gong", "bass", "p0", "p1", "p2", "p3", "p4", "p5", "p6"], "playkeys"],
+  ["Choose a world", ["presets"], "presets"],
+  ["Change how it plays", ["algo"], "algo"],
+  ["Let it drift", ["select"], "tide"],
+  ["Effects for a moment", ["fx", "scl", "env", "lfo", "edit", "glo"], "punch"],
+  ["Moments", ["mhome", "msave", "marp", "mseq"], "moments"],
+  ["Fade with MASTER", ["master"], "hero"]
+];
+const STEP_TEXT = [
+  "Everything begins here. A slow chord progression starts and keeps going by itself. While stopped, PLAY breathes.",
+  "SPACE, ECHO, GLOW and MOTION are the main way to play live: how far away, the echoes, dark or bright, and how much it moves. Turn them slowly.",
+  "The first seven white keys switch layers on and off: pad, bass, arpeggio, sparkle, melody, voice and shimmer. Lit means playing.",
+  "The black keys are chords to move to: plain on the left, with a soft colour on the right. The lit one sounds now.",
+  "The other white keys play over the music: a deep gong, a held bass, then seven notes of the chord going up. Never a wrong note.",
+  "Turn PRESETS for another world: new sounds, key, tempo and room. The music dips out and comes back in.",
+  "Turn ALGORITHM for another behaviour: drift, ripple, swell, chime or pulse. The screen shows its rhythm.",
+  "Turn SELECT for the tide: from STILL, one chord until you choose, to WANDERING, where chords and layers come and go.",
+  "Hold FX, SCL, ENV, LFO, EDIT or GLO for an effect on the whole sound: echoes, stutter, freeze, shimmer, underwater, wash. They wait for the beat.",
+  "Press HOME, SAVE, ARP or SEQ for a moment: home, breathe, cascade or swell. Each plays itself out and gives the music back.",
+  "Haave never fades by itself. Fade in and out with MASTER, as slowly as the moment needs."
+];
+
+/* ---- the FM-1, drawn (the layout of web/emu, simplified) ---- */
+const NS = "http://www.w3.org/2000/svg", svg = document.getElementById("fm1");
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  (parent || svg).appendChild(e);
+  return e;
+}
+el("rect", { x: 1, y: 1, width: 818, height: 518, rx: 30, fill: "#151936", stroke: "#2a2d55", "stroke-width": 2 });
+el("rect", { x: 216, y: 16, width: 212, height: 212, rx: 14, fill: "#090b1c", stroke: "#2a2d55", "stroke-width": 1.5 });
+el("rect", { x: 222, y: 22, width: 200, height: 200, rx: 3, fill: "#0e1124" });
+const groups = {};
+function ctl(id, label) {
+  const g = el("g", { class: "ctl", tabindex: 0, role: "button", "data-id": id,
+                      "aria-label": (label || CTL[id].title) + ": " + CTL[id].grp });
+  (groups[id] = groups[id] || []).push(g);
+  return g;
+}
+function knob(id, cx, cy, label) {
+  el("text", { x: cx, y: cy - 34, "text-anchor": "middle", class: "lbl" }).textContent = label;
+  const g = ctl(id, label);
+  el("circle", { cx, cy, r: 24, class: "face knob" }, g);
+  el("line", { x1: cx, y1: cy - 8, x2: cx, y2: cy - 19, stroke: CTL[id].col, "stroke-width": 3, "stroke-linecap": "round", class: "slit" }, g);
+}
+function button(id, x, y, w, h, label) {
+  const g = ctl(id, label);
+  el("rect", { x, y, width: w, height: h, rx: 9, class: "face" }, g);
+  el("text", { x: x + w / 2, y: y + h / 2 + 4, "text-anchor": "middle", class: "lbl" }, g).textContent = label;
+}
+knob("master", 62, 66, "MASTER"); knob("select", 150, 66, "SELECT");
+knob("presets", 62, 152, "PRESETS"); knob("algo", 150, 152, "ALGORITHM");
+button("oct", 30, 192, 64, 30, "OCT −"); button("oct", 118, 192, 64, 30, "OCT +");
+["k1", "k2", "k3", "k4"].forEach((id, i) => knob(id, 478 + i * 94, 66, "KNOB " + (i + 1)));
+const ROW1 = PUNCH.map(p => [p[0].toLowerCase(), p[0]]);
+const ROW2 = [["mhome", "HOME"], ["msave", "SAVE"], ["marp", "ARP"], ["mseq", "SEQ"], ["play", "PLAY"], ["rec", "REC"]];
+ROW1.forEach(([id, l], i) => button(id, 448 + i * 58.4, 112, 52, 40, l));
+ROW2.forEach(([id, l], i) => button(id, 448 + i * 58.4, 162, 52, 40, l));
+function key(id, x, y, h, col, label) {
+  const g = ctl(id, label);
+  el("rect", { x, y, width: 42, height: h, rx: 10, class: "face" }, g);
+  el("rect", { x: x + 18, y: y + 14, width: 6, height: h - 44, rx: 3, fill: col, class: "slit" }, g);
+  if (label) el("text", { x: x + 21, y: y + h - 12, "text-anchor": "middle", class: "klbl" }, g).textContent = label;
+}
+const WHITE = ["l0", "l1", "l2", "l3", "l4", "l5", "l6", "gong", "bass", "p0", "p1", "p2", "p3", "p4", "p5", "p6"];
+const WLBL = ["PAD", "BASS", "ARP", "SPARK", "MEL", "VOX", "SHIM", "GONG", "BASS", "", "", "", "", "", "", ""];
+WHITE.forEach((id, i) => key(id, 29 + i * 48, 362, 136, CTL[id].col, WLBL[i]));
+[0, 1, 2, 4, 5, 7, 8, 9, 11, 12, 14].forEach((j, i) => key("b" + i, 26 + (j + 1) * 48 - 21, 246, 104, C.rose, ""));
+
+/* ---- choosing ---- */
+const scr = document.getElementById("scr"), scrBig = document.getElementById("scr-big"), grp = document.getElementById("c-grp"), title = document.getElementById("c-title"),
+      text = document.getElementById("c-text"), onScreen = document.getElementById("c-screen"),
+      stepsEl = document.getElementById("steps"), back = document.getElementById("back"), next = document.getElementById("next"),
+      where = document.getElementById("where");
+const still = matchMedia("(prefers-reduced-motion: reduce)");
+let step = 0, scene = "";
+function show(sc) {
+  if (sc === scene) return;
+  scene = sc;
+  scr.src = scrBig.src = "img/" + sc + (still.matches ? "s" : "") + ".webp";
+}
+function mark(ids, sel) {
+  for (const id in groups) for (const g of groups[id]) {
+    g.classList.toggle("on", ids.includes(id));
+    g.classList.toggle("sel", id === sel);
+  }
+}
+function setStep(i) {
+  step = i;
+  const [name, ids, sc] = STEPS[i];
+  grp.textContent = "Step " + (i + 1);
+  grp.style.color = C.mint;
+  title.textContent = name;
+  text.textContent = STEP_TEXT[i];
+  onScreen.textContent = SCREEN[sc];
+  mark(ids, null);
+  show(sc);
+  [...stepsEl.children].forEach((li, k) => k === i ? li.firstChild.setAttribute("aria-current", "step")
+                                                   : li.firstChild.removeAttribute("aria-current"));
+  back.disabled = i === 0;
+  next.disabled = i === STEPS.length - 1;
+  where.textContent = (i + 1) + " of " + STEPS.length;
+}
+function choose(id) {
+  const c = CTL[id], s = STEPS.findIndex(st => st[1].includes(id));
+  if (s >= 0 && s !== step) setStep(s);
+  grp.textContent = c.grp;
+  grp.style.color = c.col;
+  title.textContent = c.title;
+  text.textContent = c.text;
+  onScreen.textContent = SCREEN[c.scene];
+  mark(s >= 0 ? STEPS[s][1] : [id], id);
+  show(c.scene);
+}
+STEPS.forEach(([name], i) => {
+  const li = document.createElement("li"), b = document.createElement("button");
+  b.type = "button";
+  b.textContent = (i + 1) + " · " + name;
+  b.addEventListener("click", () => setStep(i));
+  li.appendChild(b);
+  stepsEl.appendChild(li);
+});
+back.addEventListener("click", () => step > 0 && setStep(step - 1));
+next.addEventListener("click", () => step < STEPS.length - 1 && setStep(step + 1));
+svg.addEventListener("click", e => { const g = e.target.closest(".ctl"); if (g) choose(g.dataset.id); });
+svg.addEventListener("keydown", e => {
+  const g = e.target.closest(".ctl");
+  if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); choose(g.dataset.id); }
+});
+setStep(0);
+
+/* ---- the worlds: a still, moving while pointed at, focused or tapped ---- */
+const WORLDS = [
+  ["GLASS", "D major", 72, "A glass pad, clear bells and an airy choir.", C.sky],
+  ["EMBER", "A major", 66, "Warm strings, a soft electric piano and a warm “ooh”.", C.peach],
+  ["DUSK", "F major", 80, "A cloud pad, wooden mallets and a low hum.", C.rose],
+  ["NIGHT", "E minor", 60, "A dark pad, clear bells and a low whisper.", C.violet],
+  ["NEON", "G major", 84, "80s strings, a crystal bell and a machine voice.", C.rose],
+  ["LOFI", "E♭ major", 70, "A soft pad and mellow keys, like old tape.", C.peach],
+  ["BOWLS", "C minor", 56, "A singing bowl over a warm drone.", C.lilac],
+  ["GARDEN", "A major", 64, "A blooming pad and a kalimba.", C.mint],
+  ["FOREST", "E minor", 58, "A soft flute in the mist, a breath of wind.", C.mint],
+  ["OCEAN", "D major", 54, "Brown-noise waves, a clear bell and a low hum.", C.sky],
+  ["RAIN", "E minor", 62, "Soft rain, a kalimba and a hum.", C.sky],
+  ["CAVE", "A minor", 50, "A deep pad and a low choir, far below.", C.violet],
+  ["HANDPAN", "D minor", 66, "A handpan over a warm drone.", C.peach],
+  ["CRYSTAL", "C major", 52, "Crystal singing bowls in the air.", C.lilac]
+];
+const grid = document.getElementById("world-grid");
+WORLDS.forEach(([name, key, bpm, desc, col], i) => {
+  const n = String(i).padStart(2, "0"), f = document.createElement("figure");
+  f.className = "world";
+  f.tabIndex = 0;
+  f.innerHTML = `<img src="img/world${n}s.webp" width="240" height="88" loading="lazy" alt="${name}'s picture">` +
+    `<figcaption><b><span style="color:${col}">${name}</span><small style="color:var(--mid)">${key} · ${bpm}</small></b>` +
+    `<span>${desc}</span></figcaption>`;
+  const img = f.querySelector("img"), on = () => { if (!still.matches) { img.src = `img/world${n}.webp`; f.classList.add("live"); } },
+        off = () => { img.src = `img/world${n}s.webp`; f.classList.remove("live"); };
+  let touch = false;                                     /* (a tap toggles; a mouse moves it while it points) */
+  f.addEventListener("pointerdown", e => { touch = e.pointerType !== "mouse"; });
+  f.addEventListener("pointerenter", e => e.pointerType === "mouse" && on());
+  f.addEventListener("pointerleave", e => e.pointerType === "mouse" && off());
+  f.addEventListener("focus", () => { if (!touch) on(); });
+  f.addEventListener("blur", off);
+  f.addEventListener("click", () => { if (touch) (f.classList.contains("live") ? off : on)(); });
+  grid.appendChild(f);
+});
+</script>
 </body>
 </html>

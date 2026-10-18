@@ -11,7 +11,8 @@ good. No menus, no drums.
 
 **Website:** <https://thebrodi.github.io/fm1-haave/> · **[Try it in your browser](https://thebrodi.github.io/fm1-haave/try/)**, no FM-1 needed.
 
-> **Work in progress.** Haave runs in the browser emulator. It has not been flashed to an FM-1 yet.
+> **Work in progress.** Haave runs on my own FM-1 and in the browser emulator. There is no public release to install
+> yet.
 
 ## Why Haave
 

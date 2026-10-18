@@ -4,8 +4,26 @@
     {
       "name": "emu",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "-d", "build/emu", "8790"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "-d",
+        "build/emu",
+        "8790"
+      ],
       "port": 8790
+    },
+    {
+      "name": "site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "-d",
+        "build/site",
+        "8791"
+      ],
+      "port": 8791
     }
   ]
 }

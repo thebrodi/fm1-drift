@@ -238,7 +238,13 @@ python3 -m http.server -d build/emu 8790                                        
 
 The website (<https://thebrodi.github.io/fm1-haave/>) is the `gh-pages` branch: `tools/make_haave_site.py
 build/site` puts the landing page (`web/site/index.html`), the emulator (`try/`) and the installer (`install/`, once
-there is a package) together, and that folder is pushed as the branch.
+there is a package) together, and that folder is pushed as the branch. Its pictures are the instrument's own screen:
+`tools/make_haave_shots.py` builds `web/emu/haave_shots.c`, which plays the firmware natively through short scenes
+(each world, the knobs, the layers, the chords, the PLAY keys, PRESETS, ALGORITHM, TIDE, a punch-in, the moments) and
+takes the screen ten times a second, and writes them as animated WebP (`img/`, about 1 MB), with the screen's font
+(Inter Tight, `fonts/`). The page's FM-1 is drawn in SVG; choosing a control shows what it does and its scene on the
+screen, and the steps walk through a first session. Build the emulator with `EMU_VERSION=haave-X.Y.Z` for the page to
+show the release.
 
 `tests/haave_test.c` plays the firmware natively: every world × behaviour with every layer on (clipping, clicks, DC,
 level band), then random playing for MINUTES (default 30): output finite and below clipping, notes in range, never
