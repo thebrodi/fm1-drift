@@ -150,19 +150,28 @@ static void haave_apply(void)
     pad->p[P_LWAVE] = (int16_t)wave;
     pad->p[P_LTRIG] = 0;
     pad->p[P_ATK] = PAD_BEH[haave_style % DS_N].atk;
-    pad->p[P_REV] = (int16_t)sp;                         /* SPACE: dry and close .. a vast hall */
+    pad->p[P_REV] = (int16_t)sp;                         /* SPACE: dry and close .. a vast hall, the sound itself
+                                                          * falling back above the middle (fx.c fx_dry: -10 dB) */
     bell->p[P_REV] = (int16_t)sp;
     choir->p[P_REV] = (int16_t)sp;
     bass->p[P_REV] = (int16_t)(sp / 4);
     song.g[G_RSIZE] = (int16_t)(16 + sp * 111 / 127);
-    pad->p[P_DLY] = (int16_t)(ec * 3 / 4);               /* ECHO: none .. long trails (feedback up to 100 of 120) */
+    fx_dry_to = sp <= 64 ? 32768 : 32768 - (sp - 64) * (sp - 64) * 5645 / 1000;
+    pad->p[P_DLY] = (int16_t)(ec * 3 / 4);               /* ECHO: none .. long trails; above the middle they circle on
+                                                          * (feedback to 0.8) and darken each time */
     bell->p[P_DLY] = (int16_t)ec;
     choir->p[P_DLY] = (int16_t)(ec / 2);
-    song.g[G_DFDBK] = (int16_t)(10 + ec * 90 / 127);
+    song.g[G_DFDBK] = (int16_t)(ec <= 64 ? 10 + ec * 70 / 64 : 80 + (ec - 64) * 36 / 63);
     haave_glow(pad, pg < 0 ? 0 : pg > 127 ? 127 : pg);
     haave_glow(bell, gl);
     pad->p[P_CHOR] = (int16_t)mo;
     choir->p[P_CHOR] = (int16_t)(mo / 2);
+    /* GLOW below 48: the whole sound through a low-pass closing, muffled at the bottom (perform.c's FILTER macro, the
+     * same filter as its LPF; it glides ~45 ms); above, the sounds' own brightness as before */
+    perf_k[0] = (int8_t)(gl < 48 ? -(48 - gl) * 72 / 48 : 0);
+    /* MOTION above 56: the PHASER swirling (its depth: haave_input) and the sound drifting left and right */
+    haave_motion_phs = (uint8_t)(mo > 56);
+    haave_pan_to = mo > 56 ? (mo - 56) * 16384 / 71 : 0;
     {   /* MOTION: the pad's tone sways with its breath (CHIME: slowly by itself, ~0.13 Hz) and it breathes deeper */
         int32_t lf = mo / (pad->eng_req == ENGI_FM6 ? 2 : pad->eng_req == ENGI_NOISE ? 8 : 6);
         if (pad->eng_req == ENGI_FM6 || pad->eng_req == ENGI_NOISE) {   /* (its tops no brighter than GLOW's own top:
@@ -176,15 +185,17 @@ static void haave_apply(void)
         if (!sync)
             pad->p[P_LRATE] = 18;
     }
-    {   /* GLOW: the tails too, darker or airier (the world's room as the middle); SPACE and ECHO: further away, not
-         * louder (haave_play.c haave_gain_block: SPACE about 3 dB over its turn, ECHO 1.5) */
+    {   /* GLOW: the tails too, darker or airier (the world's room as the middle); far away (SPACE) the room darker,
+         * long echoes (ECHO) darker each time round */
         const haave_world_t *w = &HAAVE_WORLDS[haave_world % HAAVE_NWORLDS];
-        int32_t rd = w->rdamp + (64 - gl) / 2, dc = w->dcolor + (gl - 64) / 2;
+        int32_t rd = w->rdamp + (64 - gl) / 2 + (sp > 64 ? (sp - 64) / 4 : 0);
+        int32_t dc = w->dcolor + (gl - 64) / 2 - (ec > 64 ? (ec - 64) / 2 : 0);
         song.g[G_RDAMP] = (int16_t)(rd < 0 ? 0 : rd > 127 ? 127 : rd);
         song.g[G_DCOLOR] = (int16_t)(dc < 0 ? 0 : dc > 127 ? 127 : dc);
-        haave_trim_to = DG_ONE - (int32_t)((int64_t)DG_ONE * ((sp * sp * 369 + ec * ec * 159) / 100 - 35613) / 161290);
-                                                         /* (as loud as ever at the knobs' start, SPACE 90 ECHO 60; in
-                                                          * hundreds: -3561300 reads as a ROM address to build.py) */
+        int32_t le = ec * ec * 159 / 100 - 5724;          /* ECHO: -1.5 dB over its turn (as loud at its start, 60) */
+        int32_t bm = mo > 56 ? (mo - 56) * 330 / 71 : 0;  /* MOTION: +2.5 dB at its top (the PHASER's notches, the
+                                                          * drift); SPACE: as loud (the dry falls as the room grows) */
+        haave_trim_to = DG_ONE - (int32_t)((int64_t)DG_ONE * le / 161290) + (int32_t)((int64_t)DG_ONE * bm / 1000);
     }
     if (pad->eng_req == ENGI_FM6)
         pad->p[P_E0 + 6] = (int16_t)(mo * 3 / 4);        /* FM6 DTUN: the operators drift apart */
@@ -293,6 +304,7 @@ static void haave_input(void)
             haave_punch_bit[i] = 1u << panel.btn[HAAVE_PUNCH_BTN[i]];
         for (i = 0; i < DM_N; i++)
             haave_mom_bit[i] = 1u << panel.btn[HAAVE_MOMENT_BTN[i]];
+        haave_warp_bit = 1u << panel.btn[B_REC];
         haave_load(0);
     }
     for (i = 0; i < DK_N; i++)
@@ -302,6 +314,13 @@ static void haave_input(void)
             haave_apply();
             haave_bars |= (uint8_t)(1u << i);
         }
+    {   /* the PHASER's depth (perform.c perf_k[3], a cut 0..100): SWIRL full, MOTION's soft, FREEZE and SHIMMER their own
+         * (it is their level and shimmer too) */
+        int32_t mo = haave_knob[DK_MOTION], p = haave_punch, k3 = 0;
+        if (mo > 56 && !((p >> DP_SWIRL) & 1) && !((p >> DP_FREEZE) & 1) && !((p >> DP_SHIMMER) & 1))
+            k3 = 100 - (mo - 56) * 80 / 71;
+        perf_k[3] = (int8_t)k3;
+    }
     {   /* a moment's GLOW moved */
         static int8_t g;
         if (g != haave_mom_glow) {
@@ -381,8 +400,8 @@ static void haave_leds(void)
                  (haave_run && haave_deg == HAAVE_BLACK[haave_minor & 1u][p % 5u] && haave_bright == (p >= 5u));
         led_put(nl, 14u + k, (int)on);
         led_put(nd, 14u + k, 1);
-        led_put(nm, 14u + k, p >= DW_GONG && p < DW_PLAY && !key_black(k));   /* (GONG, BASS: brighter; mid over the
-                                                                               * glow, fm1_input.h) */
+        led_put(nm, 14u + k, p >= DW_DRONE && p < DW_PLAY && !key_black(k));   /* (DRONE, BASS: brighter; mid over
+                                                                                * the glow, fm1_input.h) */
     }
     led_put(nl, panel.btn[B_OCTDN], haave_oct < 0);
     led_put(nl, panel.btn[B_OCTUP], haave_oct > 0);
@@ -390,6 +409,8 @@ static void haave_leds(void)
         nl[LED_PLAY_GREEN >> 3] |= (uint8_t)(1u << (LED_PLAY_GREEN & 7u));
     else
         led_put(nb, panel.btn[B_PLAY], 1);               /* stopped: PLAY breathes, press me */
+    led_put(nl, panel.btn[B_REC], haave_warp < 65000 || (fm1_in.buttons & haave_warp_bit));   /* REC: WARP */
+    led_put(nd, panel.btn[B_REC], 1);
     for (k = 0; k < DM_N; k++) {                         /* the moment buttons: lit from the press to the end of theirs */
         led_put(nl, panel.btn[HAAVE_MOMENT_BTN[k]], haave_mom == (int8_t)k || haave_mom_req == k);
         led_put(nd, panel.btn[HAAVE_MOMENT_BTN[k]], 1);
@@ -801,9 +822,9 @@ static void haave_viz(void)
             if (viz_place(p, i, v->note, lvl, &x, &y, &rad))
                 d_disc(x, y, 2 + rad / 2, HAAVE_PCOL[p], (uint32_t)(4 + lvl / 4));   /* (dimmer as it fades) */
         }
-    {   /* a punch-in playing, else a moment: its name in the middle */
+    {   /* a punch-in playing, else WARP, else a moment: its name in the middle */
         int32_t mom = haave_mom;                         /* (once: the audio may end it meanwhile) */
-        const char *nm = mom >= 0 ? HAAVE_MOMENT[mom % DM_N] : 0;
+        const char *nm = haave_warp < 65000 ? "WARP" : mom >= 0 ? HAAVE_MOMENT[mom % DM_N] : 0;
         for (p = 0; p < DP_NPUNCH; p++)
             if ((haave_punch >> p) & 1u) {
                 nm = HAAVE_PUNCH_NAME[p];

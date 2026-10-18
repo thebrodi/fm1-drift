@@ -6,10 +6,12 @@
  *   2. every punch-in in every world: no clipping, no click, no level jump
  *   4. TIDE: FLOWING and WANDERING move the optional layers now and then, STILL and CALM never; the pad and bass stay
  *   5. the playing keys and the moments: the PLAY keys and CASCADE in the chord and in order in every world, OCT and
- *      chord; GONG and BASS sound, BASS follows a chord change and ends when let go; each moment plays out and gives
+ *      chord; DRONE and BASS sound, BASS follows a chord change and ends when let go; each moment plays out and gives
  *      the layers back; a crowd of notes takes no held note for longer than a sixteenth; nothing held ends by itself
+ *   6. WARP halves the speed and comes back, PUMP dips on the beat without a click, the held keys follow a chord and
+ *      leave nothing held, SWELL held keeps on and settles back when let go
  *   3. half an hour (simulated) of random playing: PLAY, layers, black-key chords (tapped and held), the seven knobs,
- *      OCT, the punch-ins, GONG BASS and the PLAY keys, the moments; the output always finite, below clipping, no
+ *      OCT, the punch-ins, DRONE BASS and the PLAY keys, the moments (tapped and held), WARP; the output always finite, below clipping, no
  *      clicks; every note in range (the bass from E1, the voice E2..C5, the bells up to C7); never more voices than the
  *      8; while PLAY and the pad are on, never 3 s of silence; 30..40 s after a stop, the output below -60 dBFS (no
  *      stuck note; an FM6 voice is judged by what it sounds: its own envelopes end it, a bowl's tail runs long)
@@ -52,7 +54,7 @@ static void run(double ms)
                     if (trk[p].v[v].active) {
                         act++;
                         if (trk[p].v[v].note < (p == HAAVE_BASS ? 28u : p == HAAVE_CHOIR ? 40u : 21u) ||
-                            trk[p].v[v].note > (p == HAAVE_CHOIR ? 72u : p == HAAVE_BELL ? 96u : 108u))
+                            trk[p].v[v].note > (p == HAAVE_CHOIR ? 76u : p == HAAVE_BELL ? 96u : 108u))
                             bad_note++;
                     }
             if (act > NVOICE)
@@ -184,8 +186,20 @@ static void restless(uint32_t minutes)
             web_enc(EN_SELECT, rnd(2) ? 1 : -1);
         else if (a < 97)
             button(rnd(2) ? B_OCTUP : B_OCTDN);
-        else if (a < 98)
-            button(MOMENT_BTN[rnd(DM_N)]);               /* a moment */
+        else if (a < 98) {
+            uint32_t mb = MOMENT_BTN[rnd(DM_N)];         /* a moment: tapped, or held a while */
+            if (rnd(2))
+                button(mb);
+            else {
+                web_buttons(1u << mb);
+                run(500.0 + rnd(6000));
+                web_buttons(0);
+            }
+        } else if (a < 99 && rnd(2)) {                   /* WARP: REC held a while */
+            web_buttons(1u << B_REC);
+            run(500.0 + rnd(5000));
+            web_buttons(0);
+        }
         else {                                           /* a punch-in, held for a while */
             web_buttons(1u << PUNCH_BTN[rnd(DP_NPUNCH)]);
             run(300.0 + rnd(3000));
@@ -329,7 +343,7 @@ static void playing(void)
                         last = n;
                     }
                     for (k = 0; k < 9u; k++) {           /* CASCADE: falling */
-                        uint32_t n = haave_chord_up(8u - k, haave_lo() + 5, 8u);
+                        uint32_t n = haave_chord_up(8u - k, haave_lo() + 5, 8u, 96);
                         bad += !haave_fits((int32_t)n) || n >= hi || n > 96u;
                         hi = n;
                     }
@@ -426,6 +440,97 @@ static void playing(void)
     run(3000);
 }
 
+/* 6: the new hands: WARP (REC held) halves the speed and comes back; PUMP dips on every beat (6 dB or more between the
+ * dip and the swell) and leaves no click; the PLAY keys and DRONE hold the pad while held, follow a chord change, and
+ * leave nothing held when let go (the pad's counts back to its chord's); SWELL held keeps on, let go it settles back */
+static void hands(void)
+{
+    uint32_t i, k, bad = 0;
+    printf("-- WARP, PUMP, the held keys, SWELL held\n");
+    haave_load(0);
+    haave_tide = DT_STILL;
+    haave_layers = 1u << DL_PAD | 1u << DL_MELODY | 1u << DL_ARP;
+    button(B_PLAY);
+    run(4000);
+    {   /* WARP */
+        uint32_t t0 = haave_tick, t1, t2;
+        run(4000);
+        t1 = haave_tick - t0;
+        web_buttons(1u << B_REC);
+        run(1500);
+        t0 = haave_tick;
+        run(4000);
+        t2 = haave_tick - t0;
+        web_buttons(0);
+        run(1500);
+        printf("  WARP: %u sixteenths in 4 s, held %u (%.2f), let go speed %.2f\n", t1, t2, (double)t2 / t1,
+               haave_warp / 65536.0);
+        CHECK(t2 * 10u >= t1 * 4u && t2 * 10u <= t1 * 6u, "WARP: %u sixteenths held against %u (not a half)", t2, t1);
+        CHECK(haave_warp == 65536, "WARP let go: the speed %d, not back", haave_warp);
+    }
+    {   /* PUMP: the level 10 ms at a time over 8 beats, its dips against its swells */
+        double lo = 1e9, hi = 0;
+        web_buttons(1u << B_SCL);
+        run(1500);
+        reset();
+        for (k = 0; k < 8u * 4u * 10u; k++) {        /* (a beat at 72, half time: ~1.67 s; 10 ms windows) */
+            double before = s2, r;
+            uint64_t nb = nf;
+            run(10);
+            r = (s2 - before) / (double)(nf - nb);
+            if (r > 0) {
+                lo = r < lo ? r : lo;
+                hi = r > hi ? r : hi;
+            }
+        }
+        web_buttons(0);
+        run(1000);
+        printf("  PUMP: %.1f dB between its dips and its swells, largest step %.3f\n", 10 * log10(hi / lo), jump);
+        CHECK(10 * log10(hi / lo) > 6.0, "PUMP: only %.1f dB of dip", 10 * log10(hi / lo));
+        CHECK(jump < 0.3, "PUMP: a step of %.3f (a click)", jump);
+    }
+    {   /* the keys: DRONE and three PLAY keys held across a chord change, then let go */
+        uint32_t held = 1u << PLAYK[0] | 1u << PLAYK[2] | 1u << PLAYK[4] | 1u << PLAYK[6], n0;
+        press(held);
+        run(800);
+        n0 = haave_kpad.n;
+        for (i = 0; i < haave_kpad.n; i++)
+            bad += !haave_gated(HAAVE_PAD, haave_kpad.note[i]) || !haave_fits(haave_kpad.note[i]);
+        press(held | 1u << BLACK[3]);
+        press(held);
+        run(800);
+        for (i = 0; i < haave_kpad.n; i++)
+            bad += !haave_gated(HAAVE_PAD, haave_kpad.note[i]) || !haave_fits(haave_kpad.note[i]);
+        press(0);
+        run(300);
+        for (k = 0; k < 128u; k++) {                 /* the pad's counts: its chord's notes, once each, nothing else */
+            uint32_t want = 0;
+            for (i = 0; i < haave_pad.n; i++)
+                want += haave_pad.note[i] == k;
+            bad += haave_nref[HAAVE_PAD][k] != want;
+        }
+        printf("  the keys: %u notes held (DRONE and three pressed), %u wrong\n", n0, bad);
+        CHECK(n0 >= 3u, "the keys: %u notes held, not 3 or 4 (DRONE and as many as the pad's six voices allow)", n0);
+        CHECK(haave_kpad.n == 0u && !bad, "the keys: %u left held, %u wrong", haave_kpad.n, bad);
+    }
+    {   /* SWELL held for 4 bars: still on; let go: back as it was */
+        uint8_t before = haave_layers;
+        web_buttons(1u << B_SEQ);
+        run(4 * 4 * 1667);
+        k = haave_mom == DM_SWELL;
+        web_buttons(0);
+        for (i = 0; i < 200u && haave_mom >= 0; i++)
+            run(250);
+        printf("  SWELL held 4 bars: %s; let go, %s\n", k ? "still on" : "ended", haave_mom < 0 && haave_layers == before ?
+               "back as it was" : "NOT back");
+        CHECK(k, "SWELL held: it ended by itself");
+        CHECK(haave_mom < 0 && haave_layers == before, "SWELL let go: layers %02x (were %02x)", haave_layers, before);
+    }
+    button(B_PLAY);
+    run(3000);
+    haave_tide = DT_CALM;
+}
+
 int main(int argc, char **argv)
 {
     uint32_t minutes = argc > 1 ? (uint32_t)atoi(argv[1]) : 30u;
@@ -438,6 +543,7 @@ int main(int argc, char **argv)
     tide();
     punches();
     playing();
+    hands();
     restless(minutes);
     CHECK(bad_note == 0, "%u voice blocks with a note out of range (bass from 28, voice 40..72, bells to 96, all to 108)", bad_note);
     CHECK(too_many == 0, "%u blocks with more than %u voices", too_many, NVOICE);

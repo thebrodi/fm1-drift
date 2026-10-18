@@ -32,21 +32,21 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 | Control | Does |
 |---|---|
 | **PLAY** | Starts / stops the music; stopped, everything rings out and PLAY breathes (fade by hand with the MASTER knob) |
-| **KNOB 1 — Space** | Reverb: dry and close → a vast hall; the whole a little quieter as it grows (about 4 dB over the turn), so it moves away rather than getting louder |
-| **KNOB 2 — Echo** | Delay: none → long repeating trails (1.5 dB quieter over the turn, the same idea) |
-| **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness, the analog pads' filter; the bells half as much; the reverb's damping and the echo's colour around the world's own) |
-| **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play: ×0.2 … ×2.2; chorus and drift; the pad's tone sways with its breath, and it breathes deeper) |
+| **KNOB 1 — Space** | Distance: dry and close → a vast hall; above the middle the dry sound itself falls back (to −10 dB, `fx.c` fx_dry: the reverb's and echo's returns as they are) and the room darkens a little, so it moves away rather than getting louder |
+| **KNOB 2 — Echo** | Delay: none → long trails; above the middle the feedback climbs to 0.8 and each repeat is darker (the delay's colour), so they keep circling (1.5 dB quieter over the turn) |
+| **KNOB 3 — Glow** | Below 48: the whole sound through a low-pass closing to ~440 Hz at 0, muffled as if under water (`perform.c`'s FILTER macro, gliding ~45 ms); above: the sounds' own brightness (FM brightness, the analog pads' filter; the bells half as much; the reverb's damping and the echo's colour around the world's own). About 20 dB less above 1.5 kHz at 0 than at 127, the level the same |
+| **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play: ×0.2 … ×2.2; chorus and drift; the pad's tone sways with its breath, and it breathes deeper); above 56 the PHASER swirls in (up to 80 % of its depth) and the sound drifts left and right (a cycle every two bars, the far side to −6 dB), +2.5 dB at the top to stay as loud |
 | **White keys 1–7** | Toggle the 7 layers, lit while on |
-| **White keys 8–9** | GONG and BASS (below), a little brighter than the rest |
-| **White keys 10–16** | PLAY keys: the chord's tones going up (below) |
+| **White keys 8–9** | DRONE and BASS (below), a little brighter than the rest |
+| **White keys 10–16** | PLAY keys: the chord's tones going up, held (below) |
 | **Black keys** | Chords to move to: press = go there; the chord lasts as long as TIDE's chords do (STILL: until the next press) |
 | **PRESETS** knob | The world: the sounds, the key and the tempo. Playing, a change dips out (1.5 s) and back in (2.5 s): no cut |
 | **ALGORITHM** knob | The behaviour: how every layer plays (DRIFT, RIPPLE, SWELL, CHIME, PULSE); its rhythm shown a moment |
 | **SELECT** knob | TIDE: how much the music moves by itself (STILL, CALM, FLOWING, WANDERING); shown a moment |
 | **OCT− / OCT+** | Everything an octave down / up |
 | **FX SCL ENV LFO EDIT GLO** | Punch-in effects on the whole sound while held (below) |
-| **HOME SAVE ARP SEQ** | Moments: one press, it plays itself out (below) |
-| REC | Unused |
+| **HOME SAVE ARP SEQ** | Moments: SWELL and BREATHE held, CASCADE and HOME a tap (below) |
+| **REC** | WARP while held (below) |
 
 ### Layers (white keys, from the left)
 
@@ -61,35 +61,49 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 | 7 | SHIMMER | A high note above the pad, an octave up |
 
 PAD and MELODY are on at power-on. The FM-1 sounds 8 voices at once across 4 parts, so the layers
-share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), VOX (part 4). The GONG and
-the PLAY keys sound in part 2 too. When all 8 are held, the oldest bell lets go first (it rings out on its release)
-rather than a held pad, bass or voice note being taken; and a held note the budget takes anyway (a crowd of strikes in
-one block, or the CPU's shedding on the device) is played again within a sixteenth.
+share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), VOX (part 4). DRONE and
+the PLAY keys hold notes in part 1 (the pad's sound), or part 4 (the voice) in OCEAN and RAIN, whose pad is noise; a
+note two of them hold (the pad's chord, a key) sounds once and ends with its last holder (`haave_nref`). When all 8
+are held, the oldest bell lets go first (it rings out on its release) rather than a held pad, bass, voice or key note
+being taken; and a held note the budget takes anyway (a crowd of strikes in one block, or the CPU's shedding on the
+device) is played again within a sixteenth.
 
 ### Playing along (white keys 8–16)
 
-The right part of the keyboard plays over the music, with the world's own sounds, and every note fits:
+The right part of the keyboard plays over the music, with the world's own sounds, held while the key is (they swell
+in and fade out on the sound's own envelope), and every note fits:
 
 | Key | Plays |
 |---|---|
-| 8 | GONG: the chord's root low on the world's bell, its octave softly above |
-| 9 | BASS: the chord's root on the bass while the key is held, following the chords like the BASS layer (whose note, if it plays, is struck again) |
-| 10–16 | The chord's three tones from about C4 up, then again an octave higher, and the lowest once more two octaves up: seven notes going up. They follow the chord: press a black key and the same keys play the new chord |
+| 8 | DRONE: the chord's root on the pad's sound, below its chord |
+| 9 | BASS: the chord's root on the bass, following the chords like the BASS layer (whose note, if it plays, is struck again) |
+| 10–16 | The chord's three tones from about C4 up, then again an octave higher, and the lowest once more two octaves up (E6 at most): seven notes going up, on the pad's sound. In OCEAN and RAIN (a noise pad) they sing on the world's voice instead, E2 to E5 |
 
-They light while held, and they play when the music is stopped too.
+They follow the chord: a chord change moves the held notes to the new one. They light while held, and they play when
+the music is stopped too. They take only the voices left: the pad's sound has 6 of its own (an FM pad; the voice 4),
+its chord three of them, so with DRONE held two or three PLAY keys sound at once, the latest pressed; SHIMMER steps
+aside while keys are held.
 
 ### Moments (HOME SAVE ARP SEQ)
 
-One press, and the moment starts on the next beat, plays itself out and gives the music back as it was (a layer
-toggled meanwhile is kept). The button lights and the name shows on the screen while it plays; a press during
-another moment ends that one. TIDE leaves the layers alone meanwhile. Stopped, they do nothing.
+A moment starts on the next beat. SWELL and BREATHE go on while their button is held (a tap: a bar) and settle back
+when it is let go; CASCADE and HOME are a tap. Each gives the music back as it was (a layer toggled meanwhile is
+kept). The button lights from the press until the moment has settled, and its name shows on the screen; a press
+during another moment ends that one. TIDE leaves the layers alone meanwhile. Stopped, they do nothing.
 
 | Button | Moment |
 |---|---|
-| HOME | HOME: back to the path's first chord, landing with the gong and the bass (a bar) |
-| SAVE | BREATHE: only the pad, a little darker, then everything returns (2 bars) |
-| ARP | CASCADE: nine bell notes falling down the chord, from two octaves over C4 to C4, softer as they go (a bar) |
-| SEQ | SWELL: the layers join one a beat and it opens up (GLOW +32 at the top), then they go again (4 bars) |
+| HOME | HOME (a tap): back to the path's first chord, the bass struck |
+| SAVE | BREATHE (held): only the pad, a little darker (GLOW −24 over half a bar); let go, everything back on the beat |
+| ARP | CASCADE (a tap): nine bell notes falling down the chord, from two octaves over C4 to C4, softer as they go |
+| SEQ | SWELL (held): the layers join one a beat and it opens up (GLOW +32 over a bar); let go, they leave one a beat |
+
+### WARP (REC)
+
+Held, the music glides into slow motion: Haave's clock to half speed over about a second (the notes, the arpeggios,
+the chords and TIDE, PUMP's beat and MOTION's drift with it); let go, it glides back. The echoes keep their time
+(the delay jumps rather than glides on a tempo change: a bend would click, or detune them against the chords), and
+the sounds' own LFOs theirs. REC lights and WARP shows on the screen meanwhile.
 
 ### Punch-in effects (FX SCL ENV LFO EDIT GLO)
 
@@ -97,15 +111,18 @@ Hold a button and its effect plays on the whole sound; let go and it returns, li
 set (after the Pocket Operator KO-33). While the music plays they snap to the beat: a press starts
 the effect on the next beat, a release ends it at the end of the beat it is in, and a quick tap plays
 one beat. Stopped, they act at once. The button lights while held and the effect's name shows in the
-middle of the screen. They are Felucca's own performance effects (`perform.c`) on the master.
+middle of the screen. ECHOES, FREEZE, SHIMMER and WASH are Felucca's own performance effects (`perform.c`) on the
+master; PUMP is HAAVE's (`haave_gain_block`: on each beat the whole sound dips −8 dB in ~20 ms and swells back over
+three quarters of the beat, about 14 dB between the dip and the swell), and SWIRL is `perform.c`'s PHASER at its full
+depth (MOTION's softer one steps aside for FREEZE and SHIMMER, whose depth it shares).
 
 | Button | Effect |
 |---|---|
 | FX | ECHOES: everything thrown into the delay, the repeats lifted |
-| SCL | STUTTER: the last sixteenth repeats |
+| SCL | PUMP: a soft sidechain breath, the whole sound dipping on every beat and swelling back |
 | ENV | FREEZE: the moment holds |
 | LFO | SHIMMER: an octave above, beside itself |
-| EDIT | UNDERWATER: a low-pass sweeping down over a bar to a clear muffle (not to the bottom) |
+| EDIT | SWIRL: a deep, slow phaser through everything |
 | GLO | WASH: everything thrown into the reverb |
 
 ### Chords (black keys)

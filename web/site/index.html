@@ -173,7 +173,7 @@
       <p class="tag">Dream firmware for the M-VAVE FM-1 · <i>haave</i>: Finnish for a daydream, a reverie</p>
       <p class="lead">Haave turns the FM-1 into a small, simple instrument for dreamy, ambient, meditative music. Press
       PLAY and a gentle chord progression starts and keeps going by itself. Add and remove layers, move the harmony,
-      play along, and shape the sound live with four knobs. Every note fits, so it always sounds good. No menus, no
+      play along on dreamy synth sounds, and shape the sound live with four knobs. Every note fits, so it always sounds good. No menus, no
       drums.</p>
       <div class="buttons">
         <a class="btn primary" href="try/">Try it in your browser</a>
@@ -228,7 +228,7 @@
         </div>
         <div class="legend" aria-hidden="true">
           <span><i style="background:var(--sky)"></i>Layers</span>
-          <span><i style="background:var(--peach)"></i>Gong and bass</span>
+          <span><i style="background:var(--peach)"></i>Drone and bass</span>
           <span><i style="background:var(--lilac)"></i>Play along</span>
           <span><i style="background:var(--rose)"></i>Chords</span>
         </div>
@@ -308,6 +308,7 @@ const SCREEN = {
   tide: "On the screen: the tide as water, its chords riding on it.",
   punch: "On the screen: the effect's name while it plays.",
   moments: "On the screen: the moment's name while it plays.",
+  warp: "On the screen: WARP while the music slows.",
   hero: "On the screen: the music playing."
 };
 const LAYERS = [
@@ -317,32 +318,33 @@ const LAYERS = [
   ["SHIM", "A high note shining above the pad."]
 ];
 const PUNCH = [["FX", "ECHOES", "Everything thrown into the echo, the repeats lifted."],
-  ["SCL", "STUTTER", "The last sixteenth repeats."], ["ENV", "FREEZE", "The moment holds still."],
-  ["LFO", "SHIMMER", "An octave up, glittering."], ["EDIT", "UNDERWATER", "Everything dark and far away."],
+  ["SCL", "PUMP", "On every beat the music dips softly and swells back, like breathing in time."],
+  ["ENV", "FREEZE", "The moment holds still."], ["LFO", "SHIMMER", "An octave up, glittering."],
+  ["EDIT", "SWIRL", "A deep, slow phaser swirling through everything."],
   ["GLO", "WASH", "Everything into the reverb, a wash of sound."]];
-const MOMENT = [["HOME", "HOME", "Back to the first chord, landing with the gong."],
-  ["SAVE", "BREATHE", "Only the pad for two bars, a little darker; then everything returns."],
-  ["ARP", "CASCADE", "Nine bell notes falling down the chord."],
-  ["SEQ", "SWELL", "The layers join one by one and it opens up, then settles back as it was."]];
+const MOMENT = [["HOME", "HOME", "Back to the first chord, the bass struck. A tap; it starts on the next beat."],
+  ["SAVE", "BREATHE", "Hold it: only the pad, a little darker. Let go and everything returns on the beat."],
+  ["ARP", "CASCADE", "Nine bell notes falling down the chord. A tap; it starts on the next beat."],
+  ["SEQ", "SWELL", "Hold it: the layers join one by one and it opens up. Let go and it settles back as it was."]];
 const CTL = {};
 function def(id, grp, col, title, text, scene) { CTL[id] = { grp, col, title, text, scene }; }
 def("play", "Start", C.mint, "PLAY", "Starts and stops the music. A slow chord progression begins and keeps going by itself. While stopped, PLAY breathes, so you know where to start.", "play");
-def("k1", "Knob 1", C.sky, "SPACE", "How far away: from close and dry to a vast hall. Turning it up moves the music away rather than making it louder.", "knobs");
-def("k2", "Knob 2", C.lilac, "ECHO", "Echoes, from none to long, repeating trails.", "knobs");
-def("k3", "Knob 3", C.rose, "GLOW", "Dark and warm, or bright and glassy. The reverb and echoes follow it.", "knobs");
-def("k4", "Knob 4", C.mint, "MOTION", "Still and sparse, or busy and moving: more notes, and a pad that sways and breathes deeper.", "knobs");
+def("k1", "Knob 1", C.sky, "SPACE", "How far away. Turn it up and the room grows while the sound itself falls back, until only a distant wash is left. It doesn't get louder.", "knobs");
+def("k2", "Knob 2", C.lilac, "ECHO", "Echoes, from none to long trails. Above the middle they keep circling, a little darker each time round.", "knobs");
+def("k3", "Knob 3", C.rose, "GLOW", "A filter over everything. Turn it down and the music goes muffled, as if under water; turn it up and it opens bright and airy.", "knobs");
+def("k4", "Knob 4", C.mint, "MOTION", "Still, or moving. Above the middle a slow phaser swirls through the sound and it drifts between left and right; more notes, a pad that breathes deeper.", "knobs");
 def("master", "Volume", C.peach, "MASTER", "The volume. Haave starts and stops without fades on purpose, so you fade in and out by hand, as slowly as the moment needs.", "hero");
 def("presets", "The world", C.peach, "PRESETS", "Chooses the world: its sounds, key, tempo and room. Turned while playing, the music dips out and comes back in the new world, without a cut.", "presets");
 def("algo", "The behaviour", C.lilac, "ALGORITHM", "How every layer plays: DRIFT, RIPPLE, SWELL, CHIME or PULSE. Each has its own rhythm, which the screen shows for a moment.", "algo");
 def("select", "The tide", C.sky, "SELECT: TIDE", "How much the music moves by itself. STILL holds one chord until you choose another. CALM changes chord every four bars, FLOWING every two, and layers come and go. WANDERING goes anywhere, every bar.", "tide");
 def("oct", "Register", C.mid, "OCT − / OCT +", "Everything an octave down or up. Both lit means shifted.", "hero");
-def("rec", "Not used", C.dim, "REC", "Haave leaves REC alone.", "hero");
+def("rec", "Hold REC", C.peach, "WARP", "Slow motion: hold it and the music glides to half speed; let go and it glides back. The echoes keep their time.", "warp");
 LAYERS.forEach(([n, t], i) => def("l" + i, "White key " + (i + 1) + " · a layer", C.sky, n === "SPARK" ? "SPARKLE" : n === "MEL" ? "MELODY" : n === "SHIM" ? "SHIMMER" : n,
   t + " Press to switch it on or off; lit while it plays.", "layers"));
-def("gong", "White key 8 · play along", C.peach, "GONG", "A deep strike of the world's bell on the chord's root, its octave softly above.", "playkeys");
+def("drone", "White key 8 · play along", C.peach, "DRONE", "A deep note on the chord's root, in the world's own pad sound, for as long as you hold it. It follows the chords.", "playkeys");
 def("bass", "White key 9 · play along", C.peach, "BASS", "The chord's root on the bass, for as long as you hold the key. It follows the chords.", "playkeys");
 for (let i = 0; i < 7; i++)
-  def("p" + i, "White key " + (10 + i) + " · play along", C.lilac, "NOTE " + (i + 1), "The notes of the chord sounding now, going up from the left. Whatever you press fits, and when the chord changes the same keys play the new one.", "playkeys");
+  def("p" + i, "White key " + (10 + i) + " · play along", C.lilac, "NOTE " + (i + 1), "Hold it for a note of the chord sounding now, in the world's own pad sound; the keys go up from the left. It swells in and fades out when you let go, and moves with the chord. Whatever you press fits. (In OCEAN and RAIN, whose pad is the sea or the rain, the keys sing on the world's voice.)", "playkeys");
 for (let i = 0; i < 11; i++)
   def("b" + i, "Black key " + (i + 1) + " · a chord", C.rose, i < 5 ? "CHORD" : "CHORD, COLOURED",
     (i < 5 ? "A chord to move to. " : "The same chords as on the left, with a soft colour (a ninth, or a seventh on minor chords). ") +
@@ -355,12 +357,13 @@ const STEPS = [
   ["Shape it with the knobs", ["k1", "k2", "k3", "k4"], "knobs"],
   ["Add and remove layers", ["l0", "l1", "l2", "l3", "l4", "l5", "l6"], "layers"],
   ["Move the harmony", ["b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10"], "chords"],
-  ["Play along", ["gong", "bass", "p0", "p1", "p2", "p3", "p4", "p5", "p6"], "playkeys"],
+  ["Play along", ["drone", "bass", "p0", "p1", "p2", "p3", "p4", "p5", "p6"], "playkeys"],
   ["Choose a world", ["presets"], "presets"],
   ["Change how it plays", ["algo"], "algo"],
   ["Let it drift", ["select"], "tide"],
   ["Effects for a moment", ["fx", "scl", "env", "lfo", "edit", "glo"], "punch"],
   ["Moments", ["mhome", "msave", "marp", "mseq"], "moments"],
+  ["Slow it down", ["rec"], "warp"],
   ["Fade with MASTER", ["master"], "hero"]
 ];
 const STEP_TEXT = [
@@ -368,12 +371,13 @@ const STEP_TEXT = [
   "SPACE, ECHO, GLOW and MOTION are the main way to play live: how far away, the echoes, dark or bright, and how much it moves. Turn them slowly.",
   "The first seven white keys switch layers on and off: pad, bass, arpeggio, sparkle, melody, voice and shimmer. Lit means playing.",
   "The black keys are chords to move to: plain on the left, with a soft colour on the right. The lit one sounds now.",
-  "The other white keys play over the music: a deep gong, a held bass, then seven notes of the chord going up. Never a wrong note.",
+  "The other white keys play over the music in the world's own sounds: a deep drone, a bass, then seven notes of the chord going up. Hold them; they swell in and fade out. Never a wrong note.",
   "Turn PRESETS for another world: new sounds, key, tempo and room. The music dips out and comes back in.",
   "Turn ALGORITHM for another behaviour: drift, ripple, swell, chime or pulse. The screen shows its rhythm.",
   "Turn SELECT for the tide: from STILL, one chord until you choose, to WANDERING, where chords and layers come and go.",
-  "Hold FX, SCL, ENV, LFO, EDIT or GLO for an effect on the whole sound: echoes, stutter, freeze, shimmer, underwater, wash. They wait for the beat.",
-  "Press HOME, SAVE, ARP or SEQ for a moment: home, breathe, cascade or swell. Each plays itself out and gives the music back.",
+  "Hold FX, SCL, ENV, LFO, EDIT or GLO for an effect on the whole sound: echoes, pump, freeze, shimmer, swirl, wash. They wait for the beat.",
+  "Hold SEQ to swell or SAVE to breathe, and let go to settle back. Tap ARP for a cascade of bells, HOME to go back to the first chord.",
+  "Hold REC for slow motion: the music glides to half speed. Let go and it comes back up.",
   "Haave never fades by itself. Fade in and out with MASTER, as slowly as the moment needs."
 ];
 
@@ -420,8 +424,8 @@ function key(id, x, y, h, col, label) {
   el("rect", { x: x + 18, y: y + 14, width: 6, height: h - 44, rx: 3, fill: col, class: "slit" }, g);
   if (label) el("text", { x: x + 21, y: y + h - 12, "text-anchor": "middle", class: "klbl" }, g).textContent = label;
 }
-const WHITE = ["l0", "l1", "l2", "l3", "l4", "l5", "l6", "gong", "bass", "p0", "p1", "p2", "p3", "p4", "p5", "p6"];
-const WLBL = ["PAD", "BASS", "ARP", "SPARK", "MEL", "VOX", "SHIM", "GONG", "BASS", "", "", "", "", "", "", ""];
+const WHITE = ["l0", "l1", "l2", "l3", "l4", "l5", "l6", "drone", "bass", "p0", "p1", "p2", "p3", "p4", "p5", "p6"];
+const WLBL = ["PAD", "BASS", "ARP", "SPARK", "MEL", "VOX", "SHIM", "DRONE", "BASS", "", "", "", "", "", "", ""];
 WHITE.forEach((id, i) => key(id, 29 + i * 48, 362, 136, CTL[id].col, WLBL[i]));
 [0, 1, 2, 4, 5, 7, 8, 9, 11, 12, 14].forEach((j, i) => key("b" + i, 26 + (j + 1) * 48 - 21, 246, 104, C.rose, ""));
 

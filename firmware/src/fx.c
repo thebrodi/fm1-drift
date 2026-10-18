@@ -954,6 +954,23 @@ static __attribute__((noinline)) void scope_take_mix(uint32_t n)
         scope_buf[scope_w++ & (SCOPE_N - 1u)] = (int16_t)clamp(mix_l[i] + wet[i], -32767, 32767);
 }
 
+#if FELUCCA_HAAVE
+/* HAAVE (haave_ui.c haave_apply, SPACE): the dry mix's level, the buses' returns as they are: far away, the room stays
+ * and the sound itself falls back. Q15, gliding to fx_dry_to a sample at a time (the whole way in ~0.4 s) */
+static volatile int32_t fx_dry_to = 32768;
+static int32_t fx_dry = 32768;
+static __attribute__((noinline)) void fx_dry_block(uint32_t n)
+{
+    uint32_t i;
+    int32_t to = fx_dry_to;
+    for (i = 0; i < n; i++) {
+        fx_dry += clamp(to - fx_dry, -2, 2);
+        mix_l[i] = (int32_t)(((int64_t)mix_l[i] * fx_dry) >> 15);
+        mix_r[i] = (int32_t)(((int64_t)mix_r[i] * fx_dry) >> 15);
+    }
+}
+#endif
+
 /* the master with the FX layer's effects between its level and master_out (perform.c) */
 static __attribute__((noinline)) void perf_master(int32_t *out, uint32_t n)
 {
@@ -1065,6 +1082,10 @@ static void mix_block(int32_t *out, uint32_t n)
 #endif
     if (perf)
         perf_pre(mix_l, mix_r, send_d, send_r, n);
+#if FELUCCA_HAAVE
+    if (fx_dry != 32768 || fx_dry_to != 32768)
+        fx_dry_block(n);                                /* (the sends taken already: only the dry part) */
+#endif
     fx_buses(send_c, send_d, send_r, wet, n);
     if (hl.side)
         rev_side_mix(mix_l, mix_r, n);                  /* HALL: stereo */

@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
 /* HAAVE's screen for the website: the browser build (felucca_web.c) compiled natively, played through short scenes
- * (each world playing, the knobs turning, layers joining, the black keys, the PLAY keys, the worlds changing, the
- * behaviours, TIDE, a punch-in, the moments), its 240 x 240 screen taken 10 times a second. Each scene is written as
+ * (each world playing, the knobs turning, layers joining, the black keys, the keys held, the worlds changing, the
+ * behaviours, TIDE, the punch-ins, WARP, the moments), its 240 x 240 screen taken 10 times a second. Each scene is written as
  * OUT_DIR/NAME.rgb: its frames one after another, 240 x 240 RGB bytes each (tools/make_haave_shots.py makes them
  * animated WebP).
  *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -o build/haave_shots web/emu/haave_shots.c -lm
@@ -173,27 +173,23 @@ int main(int argc, char **argv)
     }
     close_scene();
 
-    reset(0, 1u << DL_PAD);                              /* playing along: GONG, a run up the PLAY keys, BASS held */
+    reset(0, 1u << DL_PAD | 1u << DL_MELODY);            /* playing along: DRONE held, PLAY keys held, BASS held */
     tap(B_PLAY);
     run(4000);
     open_scene("playkeys");
     run(500);
-    key(WHITE[7]);
-    run(1200);
-    for (i = 0; i < 7u; i++) {
-        key(WHITE[9u + i]);
-        run(220);
-    }
-    run(800);
-    web_keys(1u << WHITE[8]);
+    web_keys(1u << WHITE[7]);
+    run(1500);
+    web_keys(1u << WHITE[7] | 1u << WHITE[9]);
+    run(1300);
+    web_keys(1u << WHITE[7] | 1u << WHITE[11]);
+    run(1300);
+    web_keys(1u << WHITE[7] | 1u << WHITE[11] | 1u << WHITE[13]);
+    run(1500);
+    web_keys(1u << WHITE[8] | 1u << WHITE[12]);
     run(1800);
     web_keys(0);
-    run(400);
-    for (i = 7; i-- > 0;) {
-        key(WHITE[9u + i]);
-        run(180);
-    }
-    run(1200);
+    run(1500);
     close_scene();
 
     reset(0, L_ALIVE);                                   /* the worlds: PRESETS turning */
@@ -230,30 +226,43 @@ int main(int argc, char **argv)
     }
     close_scene();
 
-    reset(0, L_ALIVE);                                   /* a punch-in: ECHOES held, then SHIMMER */
+    reset(0, L_ALIVE);                                   /* the punch-ins: PUMP held, then SWIRL */
     tap(B_PLAY);
     run(4000);
     open_scene("punch");
     run(700);
-    web_buttons(1u << B_FX);
-    run(2200);
+    web_buttons(1u << B_SCL);
+    run(4200);
     web_buttons(0);
     run(900);
-    web_buttons(1u << B_LFO);
-    run(2200);
+    web_buttons(1u << B_EDIT);
+    run(3200);
     web_buttons(0);
     run(900);
     close_scene();
 
-    reset(0, 1u << DL_PAD | 1u << DL_MELODY);            /* the moments: CASCADE, then SWELL beginning */
+    reset(0, 1u << DL_PAD | 1u << DL_ARP | 1u << DL_MELODY);   /* WARP: REC held, the music at half speed */
+    tap(B_PLAY);
+    run(4000);
+    open_scene("warp");
+    run(1500);
+    web_buttons(1u << B_REC);
+    run(4500);
+    web_buttons(0);
+    run(2500);
+    close_scene();
+
+    reset(0, 1u << DL_PAD | 1u << DL_MELODY);            /* the moments: CASCADE, then SWELL held and let go */
     tap(B_PLAY);
     run(4000);
     open_scene("moments");
     run(500);
     tap(B_ARP);
-    run(3500);
-    tap(B_SEQ);
+    run(3000);
+    web_buttons(1u << B_SEQ);
     run(7000);
+    web_buttons(0);
+    run(3000);
     close_scene();
 
     printf("shots: %s\n", shot_dir);
