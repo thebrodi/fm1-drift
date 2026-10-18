@@ -133,20 +133,23 @@ static const struct { uint8_t sync, wave, amp, atk; int8_t glow; } PAD_BEH[DS_N]
 static void haave_apply(void)
 {
     track_t *pad = &trk[HAAVE_PAD], *bell = &trk[HAAVE_BELL], *bass = &trk[HAAVE_BASS], *choir = &trk[HAAVE_CHOIR];
-    int32_t sp = haave_knob[DK_SPACE], ec = haave_knob[DK_ECHO], gl = haave_knob[DK_GLOW] + haave_mom_glow,
-            mo = haave_knob[DK_MOTION];
+    int32_t sp = haave_knob[DK_SPACE], ec = haave_knob[DK_ECHO], mo = haave_knob[DK_MOTION];
+    int32_t gl = haave_knob[DK_GLOW] + haave_mom_glow;   /* (a moment's GLOW on top) */
+    int32_t pg, sync = PAD_BEH[haave_style % DS_N].sync, wave = PAD_BEH[haave_style % DS_N].wave,
+            amp = PAD_BEH[haave_style % DS_N].amp;
     gl = gl < 0 ? 0 : gl > 127 ? 127 : gl;
-    int32_t pg = gl + PAD_BEH[haave_style % DS_N].glow;
-    pad->p[P_LSYNC] = PAD_BEH[haave_style % DS_N].sync;
-    pad->p[P_LWAVE] = PAD_BEH[haave_style % DS_N].wave;
-    pad->p[P_LD_AMP] = PAD_BEH[haave_style % DS_N].amp;
+    pg = gl + PAD_BEH[haave_style % DS_N].glow;
+    if (pad->eng_req == ENGI_NOISE) {                    /* noise: waves, swelling and falling over two bars */
+        sync = 2;
+        wave = 0;
+        amp = 110;
+    }
+    /* (each parameter written once, its value worked out first: the audio, cutting in between two writes, would
+     * play a block of the first; the pad's breath at its base depth for 3 ms is a tick) */
+    pad->p[P_LSYNC] = (int16_t)sync;
+    pad->p[P_LWAVE] = (int16_t)wave;
     pad->p[P_LTRIG] = 0;
     pad->p[P_ATK] = PAD_BEH[haave_style % DS_N].atk;
-    if (pad->eng_req == ENGI_NOISE) {                    /* noise: waves, swelling and falling over two bars */
-        pad->p[P_LSYNC] = 2;
-        pad->p[P_LWAVE] = 0;
-        pad->p[P_LD_AMP] = 110;
-    }
     pad->p[P_REV] = (int16_t)sp;                         /* SPACE: dry and close .. a vast hall */
     bell->p[P_REV] = (int16_t)sp;
     choir->p[P_REV] = (int16_t)sp;
@@ -160,13 +163,21 @@ static void haave_apply(void)
     haave_glow(bell, gl);
     pad->p[P_CHOR] = (int16_t)mo;
     choir->p[P_CHOR] = (int16_t)(mo / 2);
-    pad->p[P_LD_FLT] = (int16_t)(mo / (pad->eng_req == ENGI_FM6 ? 2 : pad->eng_req == ENGI_NOISE ? 8 : 6));   /* MOTION:
-                                                     * the pad's tone sways with its breath (CHIME: slowly by itself) */
-    pad->p[P_LD_AMP] = (int16_t)(pad->p[P_LD_AMP] + mo / 5);   /* .. and breathes deeper */
-    if (!pad->p[P_LSYNC])
-        pad->p[P_LRATE] = 18;
+    {   /* MOTION: the pad's tone sways with its breath (CHIME: slowly by itself, ~0.13 Hz) and it breathes deeper */
+        int32_t lf = mo / (pad->eng_req == ENGI_FM6 ? 2 : pad->eng_req == ENGI_NOISE ? 8 : 6);
+        if (pad->eng_req == ENGI_FM6 || pad->eng_req == ENGI_NOISE) {   /* (its tops no brighter than GLOW's own top:
+                                                                         * FM6 no fizz, the noise no crackle) */
+            int32_t room = pad->eng_req == ENGI_FM6 ? (1152 - pad->p[P_E0 + 2] * 24) / 16 : 84 - pad->p[P_E0 + 2];
+            lf = lf < room ? lf : room < 0 ? 0 : room;
+        }
+        pad->p[P_LD_FLT] = (int16_t)lf;
+        amp += mo / 5;
+        pad->p[P_LD_AMP] = (int16_t)(amp > 120 ? 120 : amp);   /* (0..127: above, its trough would turn the sound over) */
+        if (!sync)
+            pad->p[P_LRATE] = 18;
+    }
     {   /* GLOW: the tails too, darker or airier (the world's room as the middle); SPACE and ECHO: further away, not
-         * louder (haave_play.c haave_gain_block: -4 dB with all SPACE, -1.5 dB with all ECHO) */
+         * louder (haave_play.c haave_gain_block: SPACE about 3 dB over its turn, ECHO 1.5) */
         const haave_world_t *w = &HAAVE_WORLDS[haave_world % HAAVE_NWORLDS];
         int32_t rd = w->rdamp + (64 - gl) / 2, dc = w->dcolor + (gl - 64) / 2;
         song.g[G_RDAMP] = (int16_t)(rd < 0 ? 0 : rd > 127 ? 127 : rd);
@@ -346,8 +357,10 @@ static void haave_input(void)
 }
 
 /* -------------------------------------------------------------- LEDs --- */
-/* white keys: lit while their layer plays; black keys: lit while held, and the one whose chord sounds now; every key
- * is dimly lit; PLAY green while the music plays; OCT- / OCT+ lit while shifted */
+/* white keys: the seven layers lit while they play, GONG BASS and the PLAY keys while held (GONG and BASS a little
+ * brighter than the glow); black keys: lit while held, and the one whose chord sounds now; every key is dimly lit; PLAY
+ * green while the music plays, breathing while it is stopped; the moment and punch-in buttons lit while theirs plays;
+ * OCT- / OCT+ lit while shifted */
 static void haave_leds(void)
 {
     uint8_t nl[FM1_NCOL] = {0}, nd[FM1_NCOL] = {0}, nm[FM1_NCOL] = {0}, nb[FM1_NCOL] = {0};
@@ -367,7 +380,9 @@ static void haave_leds(void)
             on = ((fm1_in.notes >> k) & 1u) ||
                  (haave_run && haave_deg == HAAVE_BLACK[haave_minor & 1u][p % 5u] && haave_bright == (p >= 5u));
         led_put(nl, 14u + k, (int)on);
-        led_put(p >= DW_GONG && p < DW_PLAY && !key_black(k) ? nm : nd, 14u + k, 1);   /* (GONG, BASS: brighter) */
+        led_put(nd, 14u + k, 1);
+        led_put(nm, 14u + k, p >= DW_GONG && p < DW_PLAY && !key_black(k));   /* (GONG, BASS: brighter; mid over the
+                                                                               * glow, fm1_input.h) */
     }
     led_put(nl, panel.btn[B_OCTDN], haave_oct < 0);
     led_put(nl, panel.btn[B_OCTUP], haave_oct > 0);
@@ -375,8 +390,8 @@ static void haave_leds(void)
         nl[LED_PLAY_GREEN >> 3] |= (uint8_t)(1u << (LED_PLAY_GREEN & 7u));
     else
         led_put(nb, panel.btn[B_PLAY], 1);               /* stopped: PLAY breathes, press me */
-    for (k = 0; k < DM_N; k++) {                         /* the moment buttons: lit while theirs plays, dim otherwise */
-        led_put(nl, panel.btn[HAAVE_MOMENT_BTN[k]], haave_mom == (int8_t)k);
+    for (k = 0; k < DM_N; k++) {                         /* the moment buttons: lit from the press to the end of theirs */
+        led_put(nl, panel.btn[HAAVE_MOMENT_BTN[k]], haave_mom == (int8_t)k || haave_mom_req == k);
         led_put(nd, panel.btn[HAAVE_MOMENT_BTN[k]], 1);
     }
     for (k = 0; k < DP_NPUNCH; k++) {                    /* the punch-in buttons: lit while held, dim otherwise */
@@ -787,7 +802,8 @@ static void haave_viz(void)
                 d_disc(x, y, 2 + rad / 2, HAAVE_PCOL[p], (uint32_t)(4 + lvl / 4));   /* (dimmer as it fades) */
         }
     {   /* a punch-in playing, else a moment: its name in the middle */
-        const char *nm = haave_mom >= 0 ? HAAVE_MOMENT[haave_mom % DM_N] : 0;
+        int32_t mom = haave_mom;                         /* (once: the audio may end it meanwhile) */
+        const char *nm = mom >= 0 ? HAAVE_MOMENT[mom % DM_N] : 0;
         for (p = 0; p < DP_NPUNCH; p++)
             if ((haave_punch >> p) & 1u) {
                 nm = HAAVE_PUNCH_NAME[p];

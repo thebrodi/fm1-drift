@@ -61,7 +61,10 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 | 7 | SHIMMER | A high note above the pad, an octave up |
 
 PAD and MELODY are on at power-on. The FM-1 sounds 8 voices at once across 4 parts, so the layers
-share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), VOX (part 4).
+share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), VOX (part 4). The GONG and
+the PLAY keys sound in part 2 too. When all 8 are held, the oldest bell lets go first (it rings out on its release)
+rather than a held pad, bass or voice note being taken; and a held note the budget takes anyway (a crowd of strikes in
+one block, or the CPU's shedding on the device) is played again within a sixteenth.
 
 ### Playing along (white keys 8–16)
 
@@ -70,7 +73,7 @@ The right part of the keyboard plays over the music, with the world's own sounds
 | Key | Plays |
 |---|---|
 | 8 | GONG: the chord's root low on the world's bell, its octave softly above |
-| 9 | BASS: the chord's root on the bass, held while the key is (the BASS layer's note struck again if it plays) |
+| 9 | BASS: the chord's root on the bass while the key is held, following the chords like the BASS layer (whose note, if it plays, is struck again) |
 | 10–16 | The chord's three tones from about C4 up, then again an octave higher, and the lowest once more two octaves up: seven notes going up. They follow the chord: press a black key and the same keys play the new chord |
 
 They light while held, and they play when the music is stopped too.
@@ -85,7 +88,7 @@ another moment ends that one. TIDE leaves the layers alone meanwhile. Stopped, t
 |---|---|
 | HOME | HOME: back to the path's first chord, landing with the gong and the bass (a bar) |
 | SAVE | BREATHE: only the pad, a little darker, then everything returns (2 bars) |
-| ARP | CASCADE: twelve bell notes falling down the chord from two octaves up, softer as they go (a bar) |
+| ARP | CASCADE: nine bell notes falling down the chord, from two octaves over C4 to C4, softer as they go (a bar) |
 | SEQ | SWELL: the layers join one a beat and it opens up (GLOW +32 at the top), then they go again (4 bars) |
 
 ### Punch-in effects (FX SCL ENV LFO EDIT GLO)

@@ -5,10 +5,13 @@
  *   1. every world x behaviour with every layer on: no clipping, no clicks, no DC, never silent, levels in a band
  *   2. every punch-in in every world: no clipping, no click, no level jump
  *   4. TIDE: FLOWING and WANDERING move the optional layers now and then, STILL and CALM never; the pad and bass stay
+ *   5. the playing keys and the moments: the PLAY keys and CASCADE in the chord and in order in every world, OCT and
+ *      chord; GONG and BASS sound, BASS follows a chord change and ends when let go; each moment plays out and gives
+ *      the layers back; a crowd of notes takes no held note for longer than a sixteenth; nothing held ends by itself
  *   3. half an hour (simulated) of random playing: PLAY, layers, black-key chords (tapped and held), the seven knobs,
- *      OCT, the punch-ins; the output always finite, below clipping, no clicks; every note in range (the bass from E1, the voice
- *      E2..C5, the bells up to C7); never more voices than the 8;
- *      while PLAY and the pad are on, never 3 s of silence; 30..40 s after a stop, the output below -60 dBFS (no
+ *      OCT, the punch-ins, GONG BASS and the PLAY keys, the moments; the output always finite, below clipping, no
+ *      clicks; every note in range (the bass from E1, the voice E2..C5, the bells up to C7); never more voices than the
+ *      8; while PLAY and the pad are on, never 3 s of silence; 30..40 s after a stop, the output below -60 dBFS (no
  *      stuck note; an FM6 voice is judged by what it sounds: its own envelopes end it, a bowl's tail runs long)
  *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -Iweb/emu -o build/haave_test tests/haave_test.c -lm
  *   build/haave_test [MINUTES]          exit 0: all passed */
@@ -21,7 +24,7 @@ static uint32_t rnd(uint32_t n) { t_seed = t_seed * 1664525u + 1013904223u; retu
 static double pk, s2, s1, jump;          /* the last run: peak, sum of squares, sum, largest sample step */
 static uint64_t nf;
 static float last_l, last_r;
-static uint32_t bad_note, too_many;
+static uint32_t bad_note, too_many, lost, lost_run, lost_long;
 
 /* render ms of audio, checking every sample and the voices after each block */
 static void run(double ms)
@@ -54,6 +57,18 @@ static void run(double ms)
                     }
             if (act > NVOICE)
                 too_many++;
+            {   /* a held note whose voice the budget took: back within about a sixteenth (haave_heal) */
+                const haave_held_t *H[3] = {&haave_pad, &haave_bass, &haave_choir};
+                uint32_t h, j, gone = 0;
+                for (h = 0; h < 3u; h++)
+                    for (j = 0; j < H[h]->n; j++) {
+                        const track_t *tt = &trk[H[h]->part];
+                        gone += !(tt->xf_on || tt->eng_req != tt->engine) && !haave_gated(H[h]->part, H[h]->note[j]);
+                    }
+                lost += gone != 0;
+                lost_run = gone ? lost_run + 1u : 0u;
+                lost_long += lost_run == 160u;           /* (~0.46 s: a half-time sixteenth and a bit) */
+            }
         }
     }
 }
@@ -142,7 +157,7 @@ static void punches(void)
 /* 2: random playing */
 static void restless(uint32_t minutes)
 {
-    uint32_t t, silent = 0, keys = 0, stops = 0, stuck = 0, end = minutes * 60000u;
+    uint32_t t, silent = 0, keys = 0, stops = 0, stuck = 0, end = minutes * 60000u, heals0 = haave_heals;
     printf("-- %u minutes of random playing\n", minutes);
     reset();
     for (t = 0; t < end;) {
@@ -208,7 +223,8 @@ static void restless(uint32_t minutes)
             }
         }
     }
-    printf("  output peak %.3f (%.1f dBFS), largest step %.3f, %u waits after a stop\n", pk, db(pk), jump, stops);
+    printf("  output peak %.3f (%.1f dBFS), largest step %.3f, %u waits after a stop, %u held notes played again\n", pk,
+           db(pk), jump, stops, haave_heals - heals0);
     CHECK(pk < 0.9, "random playing: peak %.3f", pk);
     CHECK(jump < 0.3, "random playing: a sample step of %.3f (a click)", jump);
     CHECK(silent == 0, "random playing: %u stretches of silence while PLAY and the pad were on", silent);
@@ -298,18 +314,29 @@ static void playing(void)
 {
     uint32_t w, m, i, d, bad = 0, gave = 0;
     printf("-- the PLAY keys and the moments\n");
-    for (d = 0; d < 7u; d++)
-        for (i = 0; i < 2u; i++) {
-            uint32_t k, last = 0;
-            haave_cur = (int8_t)d;
-            haave_bright = (uint8_t)i;
-            for (k = 0; k < 7u; k++) {
-                uint32_t n = haave_key_note(k);
-                bad += !haave_fits((int32_t)n) || n <= last || n > 96u;
-                last = n;
-            }
-        }
-    CHECK(!bad, "the PLAY keys: %u notes out of the chord, not rising or above C7", bad);
+    for (w = 0; w < HAAVE_NWORLDS; w++) {                 /* every world's key and register, OCT, chord, add9 */
+        haave_load(w);
+        for (m = 0; m < 3u; m++)
+            for (d = 0; d < 7u; d++)
+                for (i = 0; i < 2u; i++) {
+                    uint32_t k, last = 0, hi = 999;
+                    haave_oct = (int8_t)((int32_t)m - 1);
+                    haave_cur = (int8_t)d;
+                    haave_bright = (uint8_t)i;
+                    for (k = 0; k < 7u; k++) {
+                        uint32_t n = haave_key_note(k);
+                        bad += !haave_fits((int32_t)n) || n <= last || n > 96u || n < 36u;
+                        last = n;
+                    }
+                    for (k = 0; k < 9u; k++) {           /* CASCADE: falling */
+                        uint32_t n = haave_chord_up(8u - k, haave_lo() + 5, 8u);
+                        bad += !haave_fits((int32_t)n) || n >= hi || n > 96u;
+                        hi = n;
+                    }
+                }
+    }
+    haave_oct = 0;
+    CHECK(!bad, "the PLAY keys and CASCADE: %u notes out of the chord, not in order, or out of range", bad);
     haave_tide = DT_CALM;                                /* (TIDE's layer changes would muddle the check) */
     button(B_PLAY);
     for (w = 0; w < HAAVE_NWORLDS; w++) {
@@ -320,9 +347,22 @@ static void playing(void)
         reset();
         press(1u << 12);                                 /* GONG */
         press(0);
-        press(1u << 14);                                 /* BASS, held a second */
-        run(1000);
+        haave_tide = DT_STILL;
+        press(1u << 14);                                 /* BASS, held: it follows a chord change, ends when let go */
+        run(500);
+        {
+            uint32_t n0 = haave_bass.n ? haave_bass.note[0] : 0, n1;
+            press(1u << 14 | 1u << BLACK[3]);
+            press(1u << 14);
+            run(500);
+            n1 = haave_bass.n ? haave_bass.note[0] : 0;
+            CHECK(n0 && n1 && (int32_t)n1 % 12 == ((int32_t)haave_root + haave_step(haave_cur)) % 12,
+                  "%s: the BASS key %u -> %u, the chord's root %d", HAAVE_WORLDS[w].name, n0, n1,
+                  ((int32_t)haave_root + haave_step(haave_cur)) % 12);
+        }
         press(0);
+        CHECK(haave_bass.n == 0, "%s: the BASS key let go, the bass still holds", HAAVE_WORLDS[w].name);
+        haave_tide = DT_CALM;
         for (i = 0; i < 7u; i++) {                       /* a run up the PLAY keys */
             press(1u << PLAYK[1u + i]);
             press(0);
@@ -347,7 +387,41 @@ static void playing(void)
             CHECK(pk < 0.9 && jump < 0.3, "%s: %s peaks %.3f, step %.3f", HAAVE_WORLDS[w].name, HAAVE_MOMENT[m], pk, jump);
         }
     }
-    printf("  %u of %u moments played out and gave the music back\n", gave, HAAVE_NWORLDS * DM_N);
+    printf("  %u of %u moments played out and gave the music back\n", gave, (unsigned)(HAAVE_NWORLDS * DM_N));
+    for (w = 0; w < HAAVE_NWORLDS; w++) {                 /* a crowd: every layer, the busiest behaviours, the gong and
+                                                          * quick runs up the PLAY keys (the voice budget) */
+        haave_load(w);
+        haave_style = (uint8_t)(w % 2u ? DS_RIPPLE : DS_CHIME);
+        haave_apply();
+        run(3000);
+        haave_layers = (1u << DL_N) - 1u;
+        haave_voice_held();
+        run(1000);
+        for (m = 0; m < 4u; m++) {
+            press(1u << 12);
+            press(0);
+            for (i = 0; i < 7u; i++) {
+                press(1u << PLAYK[1u + i]);
+                press(0);
+            }
+            run(600);
+        }
+    }
+    printf("  a crowd of notes: held notes away %u blocks in all, %u for longer than a sixteenth\n", lost, lost_long);
+    for (w = 0; w < HAAVE_NWORLDS; w++) {                 /* held a minute, nothing else: no held sound ends by itself
+                                                          * (haave_heal would strike it again: a repeat you hear) */
+        uint32_t h0;
+        haave_load(w);
+        haave_tide = DT_STILL;
+        run(3000);
+        haave_layers = 1u << DL_PAD | 1u << DL_BASS | 1u << DL_CHOIR | 1u << DL_SHIMMER;
+        haave_voice_held();
+        run(2000);
+        h0 = haave_heals;
+        run(60000);
+        CHECK(haave_heals == h0, "%s: %u held notes ended by themselves in a minute", HAAVE_WORLDS[w].name, haave_heals - h0);
+    }
+    haave_tide = DT_CALM;
     button(B_PLAY);
     run(3000);
 }
@@ -367,6 +441,8 @@ int main(int argc, char **argv)
     restless(minutes);
     CHECK(bad_note == 0, "%u voice blocks with a note out of range (bass from 28, voice 40..72, bells to 96, all to 108)", bad_note);
     CHECK(too_many == 0, "%u blocks with more than %u voices", too_many, NVOICE);
+    CHECK(lost_long == 0, "%u held notes taken by the voice budget and not back within a sixteenth (%u blocks in all)",
+          lost_long, lost);
     printf(fails ? "haave test: %u FAILED\n" : "haave test passed\n", fails);
     return fails != 0;
 }

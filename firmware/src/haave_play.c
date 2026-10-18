@@ -140,13 +140,14 @@ static int haave_chance(uint32_t p, uint32_t scale)
 }
 
 /* a held voice of one part: the notes it sounds now -> want (n of them): only what changes moves */
-typedef struct { uint8_t part, n, note[4]; } haave_held_t;
-static haave_held_t haave_pad = {HAAVE_PAD, 0, {0}}, haave_bass = {HAAVE_BASS, 0, {0}},
-                    haave_choir = {HAAVE_CHOIR, 0, {0}};
-static void haave_hold_set(haave_held_t *h, const uint8_t *want, uint32_t n, uint32_t vel)
+typedef struct { uint8_t part, n, note[4], vel; } haave_held_t;
+static haave_held_t haave_pad = {HAAVE_PAD, 0, {0}, 80}, haave_bass = {HAAVE_BASS, 0, {0}, 90},
+                    haave_choir = {HAAVE_CHOIR, 0, {0}, 76};
+static uint8_t haave_kbass;              /* the BASS key held: the bass holds the chord's root as its layer would */
+static void haave_hold_set(haave_held_t *h, const uint8_t *want, uint32_t n)
 {
     track_t *t = &trk[h->part];
-    uint32_t i, j;
+    uint32_t i, j, vel = h->vel;
     for (i = 0; i < h->n; i++) {
         for (j = 0; j < n && want[j] != h->note[i]; j++)
             ;
@@ -162,6 +163,43 @@ static void haave_hold_set(haave_held_t *h, const uint8_t *want, uint32_t n, uin
     for (j = 0; j < n; j++)
         h->note[j] = want[j];
     h->n = (uint8_t)n;
+}
+
+/* 1 = part p sounds note held (gate on): the budget has not taken it */
+static int haave_gated(uint32_t p, uint32_t note)
+{
+    const track_t *t = &trk[p];
+    uint32_t i;
+    for (i = 0; i < NVOICE; i++)
+        if (t->v[i].active && t->v[i].gate && t->v[i].note == note)
+            return 1;
+    return 0;
+}
+static uint32_t haave_ngated(void)       /* the voices held now, every part */
+{
+    uint32_t p, i, n = 0;
+    for (p = 0; p < NPART; p++)
+        for (i = 0; i < NVOICE; i++)
+            n += trk[p].v[i].active && trk[p].v[i].gate;
+    return n;
+}
+
+/* the held notes the budget took (the CPU's shedding, a crowd of strikes): on again (a sixteenth's look) */
+static uint32_t haave_heals;             /* (how many: the tests) */
+static void haave_heal(void)
+{
+    haave_held_t *const H[3] = {&haave_pad, &haave_bass, &haave_choir};
+    uint32_t h, j;
+    for (h = 0; h < 3u; h++) {
+        track_t *t = &trk[H[h]->part];
+        if (t->xf_on || t->eng_req != t->engine)         /* (a sound change: its notes come after the fade) */
+            continue;
+        for (j = 0; j < H[h]->n; j++)
+            if (!haave_gated(H[h]->part, H[h]->note[j])) {
+                trk_note_on(t, H[h]->note[j], H[h]->vel);
+                haave_heals++;
+            }
+    }
 }
 
 /* a bell (part 2): struck, held HAAVE_STRIKE, then let go to ring out on its release (a note-off in the block of its
@@ -187,6 +225,17 @@ static void haave_strike(uint32_t layer, uint32_t part, uint32_t note, uint32_t 
         trk_note_off(&trk[part], note);
         trk_note_on(&trk[part], note, vel);
         return;
+    }
+    while (haave_ngated() >= NVOICE) {               /* every voice held: the oldest bell let go first (it rings out),
+                                                      * not a held pad, bass or voice note taken for this one */
+        uint32_t o = HAAVE_NBELL;
+        for (i = 0; i < HAAVE_NBELL; i++)
+            if (haave_bn[i] && haave_bt[i] < (int32_t)HAAVE_STRIKE && (o == HAAVE_NBELL || haave_bt[i] < haave_bt[o]))
+                o = i;                               /* (struck in an earlier block: its attack under way) */
+        if (o == HAAVE_NBELL)
+            break;
+        trk_note_off(&trk[HAAVE_BELL], haave_bn[o]);
+        haave_bn[o] = 0;
     }
     for (i = 0; i < HAAVE_NBELL; i++) {              /* a free slot, else the one closest to its end */
         if (!haave_bn[i] || haave_bn[i] == note) {
@@ -298,13 +347,13 @@ static void haave_voice_held(void)
     }
     if (n)
         haave_act[DL_PAD] = haave_act[DL_SHIMMER] = 255;
-    haave_hold_set(&haave_pad, want, n, 80);
+    haave_hold_set(&haave_pad, want, n);
     n = 0;
-    if (haave_on && (haave_layers >> DL_BASS) & 1u)
+    if ((haave_on && (haave_layers >> DL_BASS) & 1u) || haave_kbass)   /* (the BASS key: stopped too) */
         want[n++] = (uint8_t)haave_above(haave_note(0, lo - 22), 28u);   /* (E1, 41 Hz: lower, a small speaker loses it) */
     if (n)
         haave_act[DL_BASS] = 255;
-    haave_hold_set(&haave_bass, want, n, 90);
+    haave_hold_set(&haave_bass, want, n);
     n = 0;
     if (haave_on && (haave_layers >> DL_CHOIR) & 1u) {
         uint32_t v = haave_above(haave_note(st[haave_choir_tone % 3u], lo + haave_vox_reg), 40u);   /* (E2 ..) */
@@ -314,7 +363,7 @@ static void haave_voice_held(void)
     }
     if (n)
         haave_act[DL_CHOIR] = 255;
-    haave_hold_set(&haave_choir, want, n, 76);
+    haave_hold_set(&haave_choir, want, n);
 }
 
 /* the chord path the music walks: the world's, or anywhere (TIDE WANDERING) */
@@ -368,14 +417,14 @@ static void haave_jump(int32_t d, uint32_t bright)
 #define DW_BASS 8u
 #define DW_PLAY 9u
 static uint32_t haave_keys;              /* the keys as the last block saw them */
-static uint8_t haave_kbass;              /* the BASS key's note sounding (0: none) */
 static uint8_t haave_mom_keep;           /* a moment playing: the layers it gives back (a toggle meanwhile changes it) */
 static volatile int8_t haave_mom = -1;   /* the moment playing (DM_*), -1 none */
 
-/* the PLAY keys' note i (0..6): the chord's three tones from C4 up, then again an octave and two higher */
-static uint32_t haave_key_note(uint32_t i)
+/* the chord's tones going up from lo: note i (0..2 the three in the octave from lo, then the same octaves higher), the
+ * whole an octave lower while note `top` would be above C7 (the bells fold there: the run would turn back) */
+static uint32_t haave_chord_up(uint32_t i, int32_t lo, uint32_t top)
 {
-    int32_t st[3], t[3], lo = haave_lo() + 5, j, x;
+    int32_t st[3], t[3], x;
     uint32_t a, b;
     haave_tones(st);
     for (a = 0; a < 3u; a++)
@@ -386,9 +435,14 @@ static uint32_t haave_key_note(uint32_t i)
             t[b] = t[b - 1u];
             t[b - 1u] = x;
         }
-    j = t[i % 3u] + 12 * (int32_t)(i / 3u);
-    return (uint32_t)j;
+    while (t[top % 3u] + 12 * (int32_t)(top / 3u) > 96)
+        for (a = 0; a < 3u; a++)
+            t[a] -= 12;
+    return (uint32_t)(t[i % 3u] + 12 * (int32_t)(i / 3u));
 }
+
+/* the PLAY keys' note i (0..6): the chord's three tones from C4 up, then again an octave and two higher */
+static uint32_t haave_key_note(uint32_t i) { return haave_chord_up(i, haave_lo() + 5, 6u); }
 
 /* GONG: the chord's root low on the world's bell, with its octave softly above */
 static void haave_gong(uint32_t vel)
@@ -398,19 +452,15 @@ static void haave_gong(uint32_t vel)
     haave_strike(DL_MELODY, HAAVE_BELL, n + 12u, vel / 2u);
 }
 
-/* BASS: the chord's root on the bass, held while the key is (the BASS layer's own note struck again) */
+/* BASS: the chord's root on the bass while the key is held, following the chords as the BASS layer does (the layer's
+ * own note, already sounding, struck again) */
 static void haave_bass_key(int down)
 {
-    track_t *t = &trk[HAAVE_BASS];
-    if (haave_kbass && (haave_bass.n == 0u || haave_bass.note[0] != haave_kbass))
-        trk_note_off(t, haave_kbass);                    /* (let go, or pressed again: the last one ends) */
-    haave_kbass = 0;
-    if (!down)
-        return;
-    haave_kbass = (uint8_t)haave_above(haave_note(0, haave_lo() - 22), 28u);
-    trk_note_off(t, haave_kbass);
-    trk_note_on(t, haave_kbass, 100);
-    haave_act[DL_BASS] = 255;
+    uint32_t had = haave_bass.n;
+    haave_kbass = (uint8_t)(down != 0);
+    haave_voice_held();
+    if (down && had && haave_bass.n)
+        haave_strike(DL_BASS, HAAVE_BASS, haave_bass.note[0], 100u);
 }
 
 static void haave_keys_block(void)
@@ -418,15 +468,17 @@ static void haave_keys_block(void)
     uint32_t cur = fm1_in.notes, down = cur & ~haave_keys, up = haave_keys & ~cur, k;
     haave_keys = cur;
     for (k = 0; (down | up) && k < 27u; k++) {
-        uint32_t p = key_place(k);
+        uint32_t p;
+        if (!(((down | up) >> k) & 1u))
+            continue;
+        p = key_place(k);
         if (key_black(k)) {
             if ((down >> k) & 1u && haave_on)            /* a chord: there now, for as long as TIDE's chords last */
                 haave_jump(HAAVE_BLACK[haave_minor & 1u][p % 5u], p >= 5u);
         } else if (p == DW_BASS) {
-            if (((down | up) >> k) & 1u)
-                haave_bass_key((int)((down >> k) & 1u));
+            haave_bass_key((int)((down >> k) & 1u));
         } else if (!((down >> k) & 1u)) {
-            continue;
+            continue;                                    /* (the other keys: a press, its release nothing) */
         } else if (p < DL_N) {                           /* a layer on / off */
             haave_layers ^= (uint8_t)(1u << p);
             if (haave_mom >= 0)
@@ -462,6 +514,12 @@ static void haave_gain_block(int32_t *out, uint32_t n)
     int32_t tt = haave_trim_to;
     if (haave_gain == DG_ONE && haave_gain_to == DG_ONE && haave_trim == tt && tt == DG_ONE)
         return;
+    if (haave_gain == haave_gain_to && haave_trim == tt) {   /* steady (the knobs left alone): one gain for the block */
+        int64_t g = ((int64_t)haave_gain * haave_gain >> 24) * haave_trim >> 24;
+        for (i = 0; i < 2u * n; i++)
+            out[i] = (int32_t)((int64_t)out[i] * g >> 24);
+        return;
+    }
     for (i = 0; i < n; i++) {
         if (haave_gain < haave_gain_to)
             haave_gain = haave_gain + haave_gain_step < haave_gain_to ? haave_gain + haave_gain_step : haave_gain_to;
@@ -496,13 +554,13 @@ static void haave_punch_sync(uint32_t want)
 /* one press, from the next beat; it plays itself out and gives the music back as it was:
  *   SWELL    the layers join one a beat and it opens up, then they go again (4 bars)
  *   BREATHE  all but the pad step out and it darkens, then they return (2 bars)
- *   CASCADE  a run of bell notes falling down the chord (a bar)
+ *   CASCADE  nine bell notes falling down the chord (a bar)
  *   HOME     back to the path's first chord, landing with the gong (a bar) */
 enum { DM_SWELL, DM_BREATHE, DM_CASCADE, DM_HOME, DM_N };
 static const char *const HAAVE_MOMENT[DM_N] = {"SWELL", "BREATHE", "CASCADE", "HOME"};
 static const uint8_t MOM_LEN[DM_N] = {64, 32, 16, 16};   /* sixteenths */
 static volatile uint32_t haave_mom_bit[DM_N];   /* the buttons' bits in fm1_in.buttons (haave_ui.c sets them) */
-static uint8_t haave_mom_req = 0xFF;     /* pressed: the moment that starts at the next beat (0xFF none) */
+static volatile uint8_t haave_mom_req = 0xFF;   /* pressed: the moment that starts at the next beat (0xFF none) */
 static uint8_t haave_mom_t;              /* sixteenths into the moment */
 static volatile int8_t haave_mom_glow;   /* the moment's GLOW: added to the knob's (haave_ui.c haave_apply) */
 static uint32_t haave_mom_was;           /* the buttons as the last block saw them */
@@ -562,12 +620,12 @@ static void haave_moment(uint32_t q)
     t = haave_mom_t++;
     len = MOM_LEN[haave_mom];
     switch (haave_mom) {
-    case DM_SWELL:                                       /* in over the first two bars, out over the last */
+    case DM_SWELL:                                       /* in a layer a beat, then out one a beat (seven each way) */
         if (t % 4u == 0u && t < 28u && (b = haave_mom_diff(haave_layers, haave_mom_opt())) != 0u) {
             haave_layers ^= (uint8_t)b;
             haave_voice_held();
         }
-        if (t % 4u == 0u && t >= 44u && (b = haave_mom_diff(haave_layers, haave_mom_keep)) != 0u) {
+        if (t % 4u == 0u && t >= 36u && (b = haave_mom_diff(haave_layers, haave_mom_keep)) != 0u) {
             haave_layers ^= (uint8_t)b;
             haave_voice_held();
         }
@@ -576,14 +634,9 @@ static void haave_moment(uint32_t q)
     case DM_BREATHE:                                     /* darker, then back (the layers at its end) */
         haave_mom_glow = (int8_t)-(int32_t)(t < 8u ? 3u * t : t < 24u ? 24u : 3u * (32u - t));
         break;
-    case DM_CASCADE:                                     /* twelve notes, from two octaves up down the chord, softer */
-        if (t < 12u) {
-            int32_t st[3];
-            uint32_t k = 11u - t;
-            haave_tones(st);
-            haave_strike(DL_SPARKLE, HAAVE_BELL, haave_note(st[k % 3u], haave_lo() + 2) + 12u * (k / 3u),
-                         70u - 3u * t);
-        }
+    case DM_CASCADE:                                     /* nine notes down the chord from two octaves over C4, softer */
+        if (t < 9u)
+            haave_strike(DL_SPARKLE, HAAVE_BELL, haave_chord_up(8u - t, haave_lo() + 5, 8u), 70u - 4u * t);
         break;
     default:
         break;
@@ -658,7 +711,7 @@ static void haave_melody(const haave_beh_t *b, uint32_t q, int32_t lo, const int
             return;
         if (haave_rand(4u) == 0u)
             haave_mel_dir = (int8_t)-haave_mel_dir;
-        for (i = 0; i < 3u; i++) {                       /* a step, and another past a note that would rub */
+        for (i = 0; i < 6u; i++) {                       /* a step, and another past a note that would rub */
             haave_mel_step = (int8_t)(haave_mel_step + haave_mel_dir);
             if (haave_mel_step > 9 || haave_mel_step < 0) {
                 haave_mel_dir = (int8_t)-haave_mel_dir;
@@ -669,6 +722,8 @@ static void haave_melody(const haave_beh_t *b, uint32_t q, int32_t lo, const int
             if (haave_fits((int32_t)n) && (n + 1u) % 12u != haave_last % 12u && (n + 11u) % 12u != haave_last % 12u)
                 break;                                   /* (nor a semitone from its last note, still ringing) */
         }
+        if (i == 6u)
+            return;                                      /* (none fits: a rest, never a note that rubs) */
         haave_last = (uint8_t)n;
         if (q % 4u == 0u || haave_chance(90u, 128u))
             haave_strike(DL_MELODY, HAAVE_BELL, n, q % 8u ? 42u + haave_rand(14u) : 60u);
@@ -729,6 +784,7 @@ static void haave_sixteenth(void)
         haave_tide_wait = (uint8_t)(haave_tide == DT_FLOW ? 8u + haave_rand(9u) : 4u + haave_rand(5u));
     }
     haave_moment(q);
+    haave_heal();
     L = haave_layers;
     if (q % 4u == 0u) {                                  /* a beat: the punch-ins held now play it; let go, they end */
         haave_punch_sync(haave_punch_want | haave_punch_tap);
