@@ -167,8 +167,8 @@ static void lcd_init(void) {}
 #include "../../firmware/src/ui_menu.c"
 #include "../../firmware/src/ui_input.c"
 #include "../../firmware/src/ui_layer.c"
-#if FELUCCA_DRIFT
-#include "../../firmware/src/drift_ui.c"
+#if FELUCCA_HAAVE
+#include "../../firmware/src/haave_ui.c"
 #endif
 
 /* ------------------------------------------------------------ the flash --- */
@@ -255,11 +255,11 @@ static void cdc_task(void) {}
 #define usb_start() ((void)0)
 #define usb_retry(ms) ((void)(ms))
 #define usb_detach() ((void)0)
-#if FELUCCA_DRIFT                                 /* as felucca.c: DRIFT's panel and screen */
-#define ui_input drift_input
-#define ui_leds drift_leds
-#define ui_draw drift_draw
-#define draw_splash drift_splash
+#if FELUCCA_HAAVE                                 /* as felucca.c: HAAVE's panel and screen */
+#define ui_input haave_input
+#define ui_leds haave_leds
+#define ui_draw haave_draw
+#define draw_splash haave_splash
 #endif
 #include "../../firmware/src/master.c"
 #include "../../firmware/src/main.c"

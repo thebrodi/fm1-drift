@@ -40,7 +40,7 @@
 #define FM1_CPU1_USED FELUCCA_CPU2   /* hal/fm1_sys.h: the second core is built in; every reset holds it first (its
                                       * waiting loop is in RAM the ROM and the SPL use at boot) */
 #ifndef FELUCCA_VERSION
-#define FELUCCA_VERSION "drift-dev" /* the console, update checks; build.py --release X.Y: drift-X.Y */
+#define FELUCCA_VERSION "haave-dev" /* the console, update checks; build.py --release X.Y: haave-X.Y */
 #endif
 #if FELUCCA_OTA && !FELUCCA_FLASH
 #error "FELUCCA_OTA needs FELUCCA_FLASH"
@@ -115,12 +115,12 @@
 #if FELUCCA_CDC
 #include "console.c"
 #endif
-#if FELUCCA_DRIFT
-#include "drift_ui.c"             /* DRIFT: the panel and the screen; main.c's loop calls these */
-#define ui_input drift_input
-#define ui_leds drift_leds
-#define ui_draw drift_draw
-#define draw_splash drift_splash
+#if FELUCCA_HAAVE
+#include "haave_ui.c"             /* HAAVE: the panel and the screen; main.c's loop calls these */
+#define ui_input haave_input
+#define ui_leds haave_leds
+#define ui_draw haave_draw
+#define draw_splash haave_splash
 #endif
 #include "master.c"              /* the MASTER pot (#137: read before the audio starts) */
 #include "main.c"

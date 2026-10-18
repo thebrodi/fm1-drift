@@ -28,8 +28,8 @@ static void audio_block(int32_t *out, uint32_t n)       /* mix (fx.c), then Q15 
 {
     uint32_t i;
     mix_block(out, n);
-#if FELUCCA_DRIFT
-    drift_gain_block(out, n);                           /* DRIFT: PLAY's fades, a world change's dip (drift_play.c) */
+#if FELUCCA_HAAVE
+    haave_gain_block(out, n);                           /* HAAVE: a world change's dip (haave_play.c) */
 #endif
 #if FELUCCA_UAC
     uac_tap(out, n);                                    /* the USB audio input: the same master output */

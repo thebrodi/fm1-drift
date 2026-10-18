@@ -13,8 +13,8 @@
 #define NTRK NPART               /* tracks (the formats and the protocol count these): every track is a part */
 #define NSTEP 64
 #define HALF_FRAMES 128          /* I2S half buffer: 2.9 ms at 44.1 kHz (a key waits 0..1 half, then plays 1 half later) */
-#ifndef FELUCCA_DRIFT
-#define FELUCCA_DRIFT 1          /* DRIFT (DRIFT.md): its keys, panel and screen in place of Felucca's; 0 = Felucca */
+#ifndef FELUCCA_HAAVE
+#define FELUCCA_HAAVE 1          /* HAAVE (HAAVE.md): its keys, panel and screen in place of Felucca's; 0 = Felucca */
 #endif
 #ifndef FELUCCA_SLICE
 #define FELUCCA_SLICE 1          /* the SLICE engine (eng_slice.c), engine 13; FELUCCA_SLICE=0 builds without it */

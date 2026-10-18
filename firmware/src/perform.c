@@ -67,9 +67,9 @@ enum { PF_R8, PF_R16, PF_R32, PF_REV, PF_LPF, PF_HPF, PF_TAPE, PF_FRZ, PF_OUP, P
 #define HB_FB 269                             /* .. KNOB 4 (0 .. 100) -> the shimmer, Q15: 0 .. 0.82 */
 #define PF_TOP (63 << 8)                      /* filter cutoff index, Q8 (PF_SVF): the LPF's open end */
 #define PF_LOW (14 << 8)                      /* .. the LPF sweep's end, the HPF sweep's (and K1's) top */
-#if FELUCCA_DRIFT
+#if FELUCCA_HAAVE
 #ifndef PF_LPF_END
-#define PF_LPF_END (22 << 8)                  /* DRIFT: the LPF sweep ends clearly muffled, not at the bottom (14) */
+#define PF_LPF_END (22 << 8)                  /* HAAVE: the LPF sweep ends clearly muffled, not at the bottom (14) */
 #endif
 #else
 #define PF_LPF_END PF_LOW

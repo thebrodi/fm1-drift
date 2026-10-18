@@ -1293,8 +1293,8 @@ static int32_t click_beat_now(void)
 }
 
 /* everything that happens between two rendered blocks */
-#if FELUCCA_DRIFT
-#include "drift_play.c"             /* DRIFT: the keys play chords (drift_block, below) */
+#if FELUCCA_HAAVE
+#include "haave_play.c"             /* HAAVE: the keys and the music (haave_block, below) */
 #endif
 static void events_block(uint32_t n)
 {
@@ -1371,8 +1371,8 @@ static void events_block(uint32_t n)
         t->armp = t->p[P_AMODE];
         t->aholdp = t->p[P_AHOLD];
     }
-#if FELUCCA_DRIFT
-    drift_block(n);
+#if FELUCCA_HAAVE
+    haave_block(n);
 #else
     keyboard_block();
 #endif

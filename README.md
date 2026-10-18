@@ -1,24 +1,25 @@
-# Drift
+# Haave
 
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
-A simple, dreamy ambient instrument: custom firmware for the M-VAVE FM-1 pocket synth.
+A simple, dreamy ambient instrument: custom firmware for the M-VAVE FM-1 pocket synth. *Haave* is Finnish for a
+daydream, a reverie.
 
 Press PLAY and a gentle chord progression starts and keeps going. Add and remove layers with the white keys, jump
 to other chords with the black keys, and shape everything live with the four knobs. Every note fits, so it always sounds
 good. No menus, no drums.
 
-**Website:** <https://thebrodi.github.io/fm1-drift/> · **[Try it in your browser](https://thebrodi.github.io/fm1-drift/try/)**, no FM-1 needed.
+**Website:** <https://thebrodi.github.io/fm1-haave/> · **[Try it in your browser](https://thebrodi.github.io/fm1-haave/try/)**, no FM-1 needed.
 
-> **Work in progress.** Drift runs in the browser emulator. It has not been flashed to an FM-1 yet.
+> **Work in progress.** Haave runs in the browser emulator. It has not been flashed to an FM-1 yet.
 
-## Why Drift
+## Why Haave
 
-I'm not a music expert, and Drift isn't meant to be a full synthesizer. It deliberately limits what the FM-1 can do:
+I'm not a music expert, and Haave isn't meant to be a full synthesizer. It deliberately limits what the FM-1 can do:
 fewer functions and fewer options, so all that's left is playing melodic, dreamy, drifting sounds. I use it for live
 meditation, together with my singing bowls: slow, soft and relaxing, with nothing to get lost in.
 
-If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelton/Felucca), which Drift is built on.
+If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelton/Felucca), which Haave is built on.
 
 ## How to play
 
@@ -39,7 +40,7 @@ If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelto
 
 The worlds range from glassy bells and warm electric piano to a dark minor pad, 80s strings, lo-fi keys, a singing
 bowl over a drone, a kalimba, a soft flute, ocean waves and rain (brown noise), a deep cave, a handpan and crystal
-singing bowls. The full design and its rules are in [DRIFT.md](DRIFT.md).
+singing bowls. The full design and its rules are in [HAAVE.md](HAAVE.md).
 
 ## Try it in your browser
 
@@ -55,16 +56,16 @@ Then open <http://localhost:8790/> in Chrome or Edge and press **Switch on**.
 
 ## Building the firmware
 
-Drift builds like Felucca: see [BUILDING.md](BUILDING.md). That needs Docker Desktop on macOS, the JieLi toolchain and
+Haave builds like Felucca: see [BUILDING.md](BUILDING.md). That needs Docker Desktop on macOS, the JieLi toolchain and
 the AC79 SDK. Installing custom firmware on an FM-1 is at your own risk. Back up first, and keep M-VAVE's updater
 (official V15) ready to go back.
 
 ## Based on Felucca
 
-Drift is a fork of [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton Instruments). It replaces
-Felucca's keyboard, UI and screen with Drift's (`firmware/src/drift_play.c`, `firmware/src/drift_ui.c`) and keeps
+Haave is a fork of [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton Instruments). It replaces
+Felucca's keyboard, UI and screen with Haave's (`firmware/src/haave_play.c`, `firmware/src/haave_ui.c`) and keeps
 everything else as Felucca made it: the sound engines, effects, USB, update loader and storage. Building with
-`FELUCCA_DRIFT=0` gives plain Felucca. Felucca's own README is kept in [docs/FELUCCA.md](docs/FELUCCA.md).
+`FELUCCA_HAAVE=0` gives plain Felucca. Felucca's own README is kept in [docs/FELUCCA.md](docs/FELUCCA.md).
 
 ## Credits and licence
 
@@ -73,10 +74,10 @@ Free software: [GPL-3.0-only](LICENSE), as Felucca. The engines in `firmware/eng
 fonts and ported DSP keep their own licences ([LICENSES/](LICENSES/), [LICENSING.md](LICENSING.md),
 [CREDITS.md](CREDITS.md)).
 
-Drift is developed with the help of AI coding agents.
+Haave is developed with the help of AI coding agents.
 
-M-VAVE and FM-1 are trademarks of their respective owners. Drift is not affiliated with or endorsed by them, or by
+M-VAVE and FM-1 are trademarks of their respective owners. Haave is not affiliated with or endorsed by them, or by
 Hügelton Instruments.
 
 Felucca: Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments.
-Drift's changes: Copyright (C) 2026 Dominik Siemon.
+Haave's changes: Copyright (C) 2026 Dominik Siemon.

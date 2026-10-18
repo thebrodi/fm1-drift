@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
-/* DRIFT, heard without a browser: the browser build (felucca_web.c) compiled natively, pressing PLAY with pad, bass, melody
+/* HAAVE, heard without a browser: the browser build (felucca_web.c) compiled natively, pressing PLAY with pad, bass, melody
  * and voice, then every behaviour, every TIDE, every world and the black-key chords (it prints when each
  * starts), written as a 16-bit stereo WAV, with its peak and RMS printed.
- *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -o build/drift_render web/emu/drift_render.c -lm
- *   build/drift_render OUT.wav */
+ *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -o build/haave_render web/emu/haave_render.c -lm
+ *   build/haave_render OUT.wav */
 #include "felucca_web.c"
 
 static FILE *out;
@@ -76,21 +76,21 @@ int main(int argc, char **argv)
     tap(WHITE[DL_CHOIR]);
     render(8000);
     for (i = 1; i < DS_N; i++) {                   /* every behaviour, as ALGORITHM turns */
-        drift_style = (uint8_t)i;
-        drift_apply();
-        mark(DRIFT_STYLE[i]);
+        haave_style = (uint8_t)i;
+        haave_apply();
+        mark(HAAVE_STYLE[i]);
         render(12000);
     }
-    drift_style = DS_RIPPLE;
-    drift_apply();
+    haave_style = DS_RIPPLE;
+    haave_apply();
     for (i = 0; i < DT_N; i++) {                   /* every TIDE, as SELECT turns (RIPPLE) */
-        drift_tide = (uint8_t)i;
-        mark(DRIFT_TIDE[i]);
+        haave_tide = (uint8_t)i;
+        mark(HAAVE_TIDE[i]);
         render(i >= DT_FLOW ? 45000 : 15000);      /* (FLOWING, WANDERING: long enough for their layers to move) */
     }
-    for (i = 1; i < DRIFT_NWORLDS; i++) {          /* every world, as PRESETS turns: its own sounds, voice, behaviour */
-        drift_load(i);
-        mark(DRIFT_WORLDS[i].name);
+    for (i = 1; i < HAAVE_NWORLDS; i++) {          /* every world, as PRESETS turns: its own sounds, voice, behaviour */
+        haave_load(i);
+        mark(HAAVE_WORLDS[i].name);
         render(14000);
     }
     mark("V held 6 s on a black key, then vi add9 tapped");

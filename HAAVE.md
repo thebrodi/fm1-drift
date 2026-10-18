@@ -1,6 +1,6 @@
-# Drift — design
+# Haave — design
 
-Drift is a firmware for the M-VAVE FM-1, forked from Felucca. It is a small, simple instrument for
+Haave (Finnish: a daydream, a reverie) is a firmware for the M-VAVE FM-1, forked from Felucca. It is a small, simple instrument for
 dreamy, ambient, meditative music that always sounds good: it keeps playing by itself, and you steer
 it live. It is made for live meditation, alongside real singing bowls: slow, soft, never busy.
 
@@ -131,8 +131,8 @@ VI iv v VII i (no diminished chords, so nothing sounds harsh).
 
 ### Worlds (PRESETS)
 
-A world is a whole mood: the key and its mode, the tempo, and the sound of each part. Drift's own FM
-patches (`tools/gen_drift_patches.py`: bowl, drone, dark pad, crystal, kalimba, soft keys) are loaded
+A world is a whole mood: the key and its mode, the tempo, and the sound of each part. Haave's own FM
+patches (`tools/gen_haave_patches.py`: bowl, drone, dark pad, crystal, kalimba, soft keys) are loaded
 into a part as its own patch; Felucca's factory sounds stay as they are.
 
 | World | Key | BPM | Pad | Bells (ARP, SPARKLE, MELODY) | VOX | Behaviour, chord path |
@@ -179,7 +179,7 @@ stalactites with each note trailing smaller, fainter echoes, HANDPAN the instrum
 tone fields; each note lights its field, the pad the dome), CRYSTAL a cluster of crystals whose facets flash with
 sparkles.
 
-At power-on a splash shows a planet with two moons, DRIFT and the version. Colours: deep navy, with
+At power-on a splash shows a planet with two moons, HAAVE and the version. Colours: deep navy, with
 pastel sky, lilac, rose, mint and peach.
 
 ## Sound
@@ -191,10 +191,10 @@ pastel sky, lilac, rose, mint and peach.
 
 ## Where it lives
 
-- `firmware/src/drift_play.c`: the music: the clock, progressions, layers and black-key chords (runs in the audio
+- `firmware/src/haave_play.c`: the music: the clock, progressions, layers and black-key chords (runs in the audio
   interrupt, in place of Felucca's keyboard).
-- `firmware/src/drift_ui.c`: the knobs, buttons, LEDs and the one screen (in place of Felucca's UI).
-- `FELUCCA_DRIFT` (`core.h`, on by default) switches between them; `0` builds plain Felucca.
+- `firmware/src/haave_ui.c`: the knobs, buttons, LEDs and the one screen (in place of Felucca's UI).
+- `FELUCCA_HAAVE` (`core.h`, on by default) switches between them; `0` builds plain Felucca.
 - Felucca's sound engine (FM6, reverb, delay, chorus), USB, update loader and storage are used unchanged.
 
 ## Try it in the browser
@@ -205,17 +205,17 @@ sh web/emu/build.sh                                                             
 python3 -m http.server -d build/emu 8790                                               # http://localhost:8790/
 ```
 
-The website (<https://thebrodi.github.io/fm1-drift/>) is the `gh-pages` branch: `tools/make_drift_site.py
+The website (<https://thebrodi.github.io/fm1-haave/>) is the `gh-pages` branch: `tools/make_haave_site.py
 build/site` puts the landing page (`web/site/index.html`), the emulator (`try/`) and the installer (`install/`, once
 there is a package) together, and that folder is pushed as the branch.
 
-`tests/drift_test.c` plays the firmware natively: every world × behaviour with every layer on (clipping, clicks, DC,
+`tests/haave_test.c` plays the firmware natively: every world × behaviour with every layer on (clipping, clicks, DC,
 level band), then random playing for MINUTES (default 30): output finite and below clipping, notes in range, never
 more than 8 voices, never silent while the pad plays, silent 30–40 s after a stop. The build command is at the top of
 the file. Known rough edge: with GLOW at its maximum, OCT+ and a high ECHO, a bright chord of bells can fizz for a few
 seconds (two of six random seeds catch it).
 
-`tests/drift_harmony.c` checks that everything harmonises: every world × behaviour × TIDE with every layer
+`tests/haave_harmony.c` checks that everything harmonises: every world × behaviour × TIDE with every layer
 on, the notes heard together sampled continuously; a semitone between two of them (a minor 2nd, a major 7th, a minor
 9th) is a clash. It passes with none. What keeps it so: every melody note sits at least a whole tone from every note of
 the chord (its root too), the flowing line also never steps a semitone from its own last, still ringing note, and a
@@ -223,21 +223,21 @@ minor chord's colour (the upper black keys) is its 7th, not the 9th that rubs ag
 a black-key chord every 3 s (plain and coloured in turn); what remains (0.1 % of the time on average) is a bell still
 ringing from the chord before as a black key changes it, like a sustain pedal held across the change. Every part of
 every world is in tune within 5 cents (the analog pads' two oscillators 8 cents apart; the granular pads whose pitch
-wanders were replaced by Drift's FM CLOUD, AIR and BLOOM pads). Every pad, bell, bass and voice is levelled to within
+wanders were replaced by Haave's FM CLOUD, AIR and BLOOM pads). Every pad, bell, bass and voice is levelled to within
 about 3 dB of its kind in the other worlds, and the bright FM sounds (glass bell, crystal, kalimba, soft wood, the
 pads) soften their overtones above middle C, so nothing fizzes when played high and bright.
 
-Felucca's own suite (`tests/run_tests.sh`) passes with `FELUCCA_DRIFT=0`; with Drift its tests of Felucca's keyboard,
-MIDI-out-of-keys, SONG grid and splash keys fail, as Drift replaces those by design.
+Felucca's own suite (`tests/run_tests.sh`) passes with `FELUCCA_HAAVE=0`; with Haave its tests of Felucca's keyboard,
+MIDI-out-of-keys, SONG grid and splash keys fail, as Haave replaces those by design.
 
-To hear it without a browser, `web/emu/drift_render.c` presses PLAY, adds the layers one by one, then goes through
+To hear it without a browser, `web/emu/haave_render.c` presses PLAY, adds the layers one by one, then goes through
 the behaviours, every TIDE, every world and the black-key chords, into a WAV (the build command is at the top of the file; add
-`-DDRIFT_TRACE` to print every note struck).
+`-DHAAVE_TRACE` to print every note struck).
 
 ## How we build it
 
 1. Get Felucca's browser emulator (`web/emu/`) running unchanged.
-2. Replace Felucca's instrument and UI with Drift, keeping its hardware layer, USB, update loader,
+2. Replace Felucca's instrument and UI with Haave, keeping its hardware layer, USB, update loader,
    storage and installer (as X0X and JIANT did).
 3. Build and tune the player and the sounds in the browser emulator.
 4. Only then: the JieLi toolchain (Docker), back up the stock firmware (V15), and flash the device.

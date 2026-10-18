@@ -36,7 +36,7 @@ LOADER_MARK = b"FELUCCA-LOADER-1"
 # the unmodified official FM-1 V15 (FM-1.fwsc from M-VAVE): returning to it is allowed without --force,
 # as the web installer's "Return to official V15" (web/fm1pkg.js validateStockPackage)
 STOCK_V15_SHA256 = "db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a"
-PORT_RE = re.compile(r"fm-1|felucca|drift|jiant|ota|composite|sinco|usb-midi", re.I)   # never probe other gear (jiant: the
+PORT_RE = re.compile(r"fm-1|felucca|haave|drift|jiant|ota|composite|sinco|usb-midi", re.I)   # never probe other gear (jiant: the
 # name macOS keeps for an FM-1 that once ran JIANT, a Felucca fork, in update mode too)
 
 # seconds; the tests shorten them

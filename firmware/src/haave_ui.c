@@ -1,22 +1,22 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
-/* DRIFT: the panel and the screen (the main loop). With FELUCCA_DRIFT, felucca.c (and the browser build) call these in
+/* HAAVE: the panel and the screen (the main loop). With FELUCCA_HAAVE, felucca.c (and the browser build) call these in
  * place of Felucca's ui_input / ui_leds / ui_draw; Felucca's UI is still built (main.c's crash, update and UBOOT
- * screens use its drawing) but never runs. One page, no menus: every control does one thing (DRIFT.md).
+ * screens use its drawing) but never runs. One page, no menus: every control does one thing (HAAVE.md).
  *   PLAY       the music on / off
- *   FX SCL ENV LFO EDIT GLO   punch-in effects while held (drift_play.c)
+ *   FX SCL ENV LFO EDIT GLO   punch-in effects while held (haave_play.c)
  *   KNOB 1..4  SPACE (reverb), ECHO (delay), GLOW (brightness), MOTION (how busy; chorus and drift)
  *   PRESETS    the world: the sounds, the key and its mode, the tempo
  *   ALGORITHM  the behaviour of every layer
  *   SELECT     the progression
  *   OCT- OCT+  everything an octave down / up
- * The keys (layers, chords) and the music run in the audio ISR (drift_play.c). */
+ * The keys (layers, chords) and the music run in the audio ISR (haave_play.c). */
 
 /* ------------------------------------------------------------ worlds --- */
 /* A world (PRESETS) is a whole mood: the key and its mode, the tempo, and the sound of each of the four parts. A part
- * is an engine and one of its presets, then (FM6) one of DRIFT's own patches put in over it (tools/gen_drift_patches.py:
+ * is an engine and one of its presets, then (FM6) one of HAAVE's own patches put in over it (tools/gen_haave_patches.py:
  * loaded as the part's own patch, Felucca's factory patches untouched), at a level that sits it in the mix. */
-#include "drift_fm6.h"                   /* DRIFT_FM6[]: Drift's own FM patches (tools/gen_drift_patches.py) */
+#include "haave_fm6.h"                   /* HAAVE_FM6[]: Haave's own FM patches (tools/gen_haave_patches.py) */
 #define ENGI_ANALOG 0u                   /* engines.c ENGINES[] */
 #define ENGI_FORMANT 5u
 #define ENGI_WHEEL 7u
@@ -29,22 +29,22 @@ enum { NZ_WIND = 0, NZ_RAIN = 1 };                                            /*
 enum { RV_ROOM, RV_SPRING, RV_HALL };                                         /* G_RTYPE */
 enum { DT_4 = 0, DT_8 = 1, DT_8T = 4, DT_2 = 6, DT_1 = 7, DT_8D = 10, DT_4D = 12 };   /* G_DTIME (params.c N_DTIME) */
 #define NO_PATCH 0xFFu
-typedef struct { uint8_t engine, preset, patch, level; } drift_sound_t;
+typedef struct { uint8_t engine, preset, patch, level; } haave_sound_t;
 /* the world's VOX: a preset of the voice engine, then its eight values (VOWL VOWL2 TALK SHIFT BUZZ BRTH Q RAND: the vowel
  * and the one it moves to over TALK, the formants' shift, buzz, breath, resonance, a random vowel per note), its
  * register and level */
-typedef struct { uint8_t preset; int8_t e[8]; int8_t reg; uint8_t level; } drift_vox_t;
+typedef struct { uint8_t preset; int8_t e[8]; int8_t reg; uint8_t level; } haave_vox_t;
 typedef struct {
     const char *name;
     uint8_t root, minor, bpm;            /* the key (0 = C) and its mode, the tempo */
-    drift_sound_t part[3];               /* pad, bells, bass */
-    drift_vox_t vox;                     /* the voice */
+    haave_sound_t part[3];               /* pad, bells, bass */
+    haave_vox_t vox;                     /* the voice */
     uint8_t rtype, rdamp, dtime, dcolor; /* the room: reverb type and damping; the echo: its time and colour */
     uint8_t style, prog;                 /* the behaviour and progression it starts with (ALGORITHM, SELECT) */
     int8_t reg;                          /* semitones the whole world sits from the middle (CAVE: lower) */
-} drift_world_t;
+} haave_world_t;
 #define SUB {ENGI_ANALOG, AN_SUB_BASS, NO_PATCH, 88}
-static const drift_world_t DRIFT_WORLDS[] = {
+static const haave_world_t HAAVE_WORLDS[] = {
     {"GLASS", 2, 0, 72, {{ENGI_FM6, FM6_PAD, NO_PATCH, 102}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
      {FO_CHOIR, {0, 20, 70, 3, 30, 40, 72, 0}, 12, 82},             /* airy, high: "aah" opening to "eh" */
      RV_HALL, 60, DT_4, 64, DS_DRIFT, 1},
@@ -89,30 +89,30 @@ static const drift_world_t DRIFT_WORLDS[] = {
      {FO_CHOIR, {0, 20, 70, 4, 26, 44, 74, 0}, 12, 94},             /* an airy, high "aah" */
      RV_HALL, 50, DT_2, 56, DS_DRIFT, 1},
 };
-#define DRIFT_NWORLDS (sizeof DRIFT_WORLDS / sizeof DRIFT_WORLDS[0])
+#define HAAVE_NWORLDS (sizeof HAAVE_WORLDS / sizeof HAAVE_WORLDS[0])
 
 enum { DK_SPACE, DK_ECHO, DK_GLOW, DK_MOTION, DK_N };
-static const char *const DRIFT_KNOB[DK_N] = {"SPACE", "ECHO", "GLOW", "MOTION"};
-static int16_t drift_knob[DK_N] = {90, 60, 56, 50};   /* 0..127 */
-static uint8_t drift_world, drift_ready;
-static uint8_t drift_world_next;
-static uint8_t drift_show;               /* a picture over the scene for a moment: 1 the behaviour's rhythm, 2 the chord path */
-static uint32_t drift_show_ms;         /* the world PRESETS has turned to (shown at once; loaded at the fade's silence) */
-static uint8_t drift_redraw = 1;         /* the whole screen */
-static uint8_t drift_head = 1;           /* the top and bottom lines */
-static uint8_t drift_bars = 0xF;         /* the knobs' bars (bit per knob) */
-static int16_t drift_cut[NPART];         /* an ANALOG part's own cutoff (GLOW moves it from there) */
+static const char *const HAAVE_KNOB[DK_N] = {"SPACE", "ECHO", "GLOW", "MOTION"};
+static int16_t haave_knob[DK_N] = {90, 60, 56, 50};   /* 0..127 */
+static uint8_t haave_world, haave_ready;
+static uint8_t haave_world_next;
+static uint8_t haave_show;               /* a picture over the scene for a moment: 1 the behaviour's rhythm, 2 the chord path */
+static uint32_t haave_show_ms;         /* the world PRESETS has turned to (shown at once; loaded at the fade's silence) */
+static uint8_t haave_redraw = 1;         /* the whole screen */
+static uint8_t haave_head = 1;           /* the top and bottom lines */
+static uint8_t haave_bars = 0xF;         /* the knobs' bars (bit per knob) */
+static int16_t haave_cut[NPART];         /* an ANALOG part's own cutoff (GLOW moves it from there) */
 
 /* GLOW on one part: FM6 the modulators' level (MLVL), ANALOG the filter's cutoff around the preset's own. The bells take
  * half its range: their bright overtones, all the way up on high notes, fold back as fizz */
-static void drift_glow(track_t *t, int32_t gl)
+static void haave_glow(track_t *t, int32_t gl)
 {
     int32_t c;
     if (t->eng_req == ENGI_FM6)
-        t->p[P_E0 + 2] = (int16_t)(t == &trk[DRIFT_BELL] ? (gl - 64) / 2 : gl > 112 ? 48 : gl - 64);   /* (the pad's top: no
+        t->p[P_E0 + 2] = (int16_t)(t == &trk[HAAVE_BELL] ? (gl - 64) / 2 : gl > 112 ? 48 : gl - 64);   /* (the pad's top: no
                                                                                                     * fizz) */
     else if (t->eng_req == ENGI_ANALOG || t->eng_req == ENGI_NOISE) {   /* (the noise's FREQ is its E2) */
-        c = drift_cut[t - trk] + (t->eng_req == ENGI_NOISE ? (gl - 56) / 3 : (gl - 56) * 3 / 4);
+        c = haave_cut[t - trk] + (t->eng_req == ENGI_NOISE ? (gl - 56) / 3 : (gl - 56) * 3 / 4);
         if (t->eng_req == ENGI_NOISE && c > 80)          /* (noise: brighter, never to a crackle) */
             c = 80;
         t->p[P_E0 + (t->eng_req == ENGI_NOISE ? 2 : 4)] = (int16_t)(c < 0 ? 0 : c > 127 ? 127 : c);
@@ -130,16 +130,16 @@ static const struct { uint8_t sync, wave, amp, atk; int8_t glow; } PAD_BEH[DS_N]
 };
 
 /* the knobs and the behaviour -> the parts and the effect buses */
-static void drift_apply(void)
+static void haave_apply(void)
 {
-    track_t *pad = &trk[DRIFT_PAD], *bell = &trk[DRIFT_BELL], *bass = &trk[DRIFT_BASS], *choir = &trk[DRIFT_CHOIR];
-    int32_t sp = drift_knob[DK_SPACE], ec = drift_knob[DK_ECHO], gl = drift_knob[DK_GLOW], mo = drift_knob[DK_MOTION];
-    int32_t pg = gl + PAD_BEH[drift_style % DS_N].glow;
-    pad->p[P_LSYNC] = PAD_BEH[drift_style % DS_N].sync;
-    pad->p[P_LWAVE] = PAD_BEH[drift_style % DS_N].wave;
-    pad->p[P_LD_AMP] = PAD_BEH[drift_style % DS_N].amp;
+    track_t *pad = &trk[HAAVE_PAD], *bell = &trk[HAAVE_BELL], *bass = &trk[HAAVE_BASS], *choir = &trk[HAAVE_CHOIR];
+    int32_t sp = haave_knob[DK_SPACE], ec = haave_knob[DK_ECHO], gl = haave_knob[DK_GLOW], mo = haave_knob[DK_MOTION];
+    int32_t pg = gl + PAD_BEH[haave_style % DS_N].glow;
+    pad->p[P_LSYNC] = PAD_BEH[haave_style % DS_N].sync;
+    pad->p[P_LWAVE] = PAD_BEH[haave_style % DS_N].wave;
+    pad->p[P_LD_AMP] = PAD_BEH[haave_style % DS_N].amp;
     pad->p[P_LTRIG] = 0;
-    pad->p[P_ATK] = PAD_BEH[drift_style % DS_N].atk;
+    pad->p[P_ATK] = PAD_BEH[haave_style % DS_N].atk;
     if (pad->eng_req == ENGI_NOISE) {                    /* noise: waves, swelling and falling over two bars */
         pad->p[P_LSYNC] = 2;
         pad->p[P_LWAVE] = 0;
@@ -154,31 +154,31 @@ static void drift_apply(void)
     bell->p[P_DLY] = (int16_t)ec;
     choir->p[P_DLY] = (int16_t)(ec / 2);
     song.g[G_DFDBK] = (int16_t)(10 + ec * 90 / 127);
-    drift_glow(pad, pg < 0 ? 0 : pg > 127 ? 127 : pg);
-    drift_glow(bell, gl);
+    haave_glow(pad, pg < 0 ? 0 : pg > 127 ? 127 : pg);
+    haave_glow(bell, gl);
     pad->p[P_CHOR] = (int16_t)mo;
     choir->p[P_CHOR] = (int16_t)(mo / 2);
     if (pad->eng_req == ENGI_FM6)
         pad->p[P_E0 + 6] = (int16_t)(mo * 3 / 4);        /* FM6 DTUN: the operators drift apart */
     pad->p[P_SPRD] = (int16_t)(20 + mo * 3 / 4);
-    drift_motion = (uint8_t)mo;
+    haave_motion = (uint8_t)mo;
 }
 
 /* part t to sound d, with its envelope (atk, sus, rel) */
-static void drift_part(track_t *t, const drift_sound_t *d, int16_t atk, int16_t sus, int16_t rel)
+static void haave_part(track_t *t, const haave_sound_t *d, int16_t atk, int16_t sus, int16_t rel)
 {
     uint32_t tr = (uint32_t)(t - trk);
     set_engine_of(t, d->engine);
     apply_preset_to(t, d->preset);
-    if (d->engine == ENGI_FM6 && d->patch < DRIFT_NFM6) {   /* DRIFT's own patch, as the part's own (SLOT OWN) */
+    if (d->engine == ENGI_FM6 && d->patch < HAAVE_NFM6) {   /* HAAVE's own patch, as the part's own (SLOT OWN) */
         uint8_t v[FP_SIZE + 1u];
-        fm6_unpack(DRIFT_FM6[d->patch], v);
+        fm6_unpack(HAAVE_FM6[d->patch], v);
         fm6_set_patch(tr, v);
         fm6_own_ok &= (uint8_t)~(1u << tr);
         fm6_slot[tr] = FM6_OWN;
         t->p[P_E7] = FM6_OWN;
     }
-    drift_cut[tr] = t->p[P_E0 + (d->engine == ENGI_NOISE ? 2 : 4)];
+    haave_cut[tr] = t->p[P_E0 + (d->engine == ENGI_NOISE ? 2 : 4)];
     t->p[P_VOICE] = V_POLY;
     t->p[P_MUTE] = 0;
     t->p[P_LEVEL] = d->level;
@@ -187,138 +187,138 @@ static void drift_part(track_t *t, const drift_sound_t *d, int16_t atk, int16_t 
     t->p[P_REL] = rel;
 }
 
-static void drift_load(uint32_t w)
+static void haave_load(uint32_t w)
 {
-    const drift_world_t *d = &DRIFT_WORLDS[w % DRIFT_NWORLDS];
-    drift_world = drift_world_next = (uint8_t)(w % DRIFT_NWORLDS);
-    drift_part(&trk[DRIFT_PAD], &d->part[0], 72, 112, 104);     /* slow swell in, long tail out */
-    if (trk[DRIFT_PAD].eng_req == ENGI_ANALOG)           /* its two oscillators 8 cents apart: a chorus, still in tune */
-        trk[DRIFT_PAD].p[P_E0 + 1] = 8;
-    drift_pad_noise = trk[DRIFT_PAD].eng_req == ENGI_NOISE;
-    if (drift_pad_noise) {                               /* noise: no pitch (TRK 0); the wind brown and slowly wandering */
-        track_t *t = &trk[DRIFT_PAD];
+    const haave_world_t *d = &HAAVE_WORLDS[w % HAAVE_NWORLDS];
+    haave_world = haave_world_next = (uint8_t)(w % HAAVE_NWORLDS);
+    haave_part(&trk[HAAVE_PAD], &d->part[0], 72, 112, 104);     /* slow swell in, long tail out */
+    if (trk[HAAVE_PAD].eng_req == ENGI_ANALOG)           /* its two oscillators 8 cents apart: a chorus, still in tune */
+        trk[HAAVE_PAD].p[P_E0 + 1] = 8;
+    haave_pad_noise = trk[HAAVE_PAD].eng_req == ENGI_NOISE;
+    if (haave_pad_noise) {                               /* noise: no pitch (TRK 0); the wind brown and slowly wandering */
+        track_t *t = &trk[HAAVE_PAD];
         t->p[P_E0 + 4] = 0;
         if (d->part[0].preset == NZ_WIND) {
             t->p[P_E0 + 1] = 120;                        /* COLR: brown */
-            t->p[P_E0 + 2] = drift_cut[DRIFT_PAD] = 70;  /* FREQ */
+            t->p[P_E0 + 2] = haave_cut[HAAVE_PAD] = 70;  /* FREQ */
             t->p[P_E0 + 3] = 10;                         /* RES */
             t->p[P_E0 + 6] = 60;                         /* DRFT */
         }
         if (d->part[0].preset == NZ_RAIN) {             /* softer drops: lower and rounder (no crackle) */
-            t->p[P_E0 + 2] = drift_cut[DRIFT_PAD] = 62;  /* FREQ */
+            t->p[P_E0 + 2] = haave_cut[HAAVE_PAD] = 62;  /* FREQ */
             t->p[P_E0 + 3] = 70;                         /* RES */
         }
     }
-    drift_reg = d->reg;
-    trk[DRIFT_PAD].p[P_DEC] = 90;
-    drift_part(&trk[DRIFT_BELL], &d->part[1], 0, 127, 100);     /* struck: its own decay, a long release */
-    trk[DRIFT_BELL].p[P_PAN] = 20;
-    drift_part(&trk[DRIFT_BASS], &d->part[2], 40, 120, 90);
+    haave_reg = d->reg;
+    trk[HAAVE_PAD].p[P_DEC] = 90;
+    haave_part(&trk[HAAVE_BELL], &d->part[1], 0, 127, 100);     /* struck: its own decay, a long release */
+    trk[HAAVE_BELL].p[P_PAN] = 20;
+    haave_part(&trk[HAAVE_BASS], &d->part[2], 40, 120, 90);
     {   /* the voice: its preset, then the world's own vowel, register and level */
-        const drift_sound_t v = {ENGI_FORMANT, d->vox.preset, NO_PATCH, d->vox.level};
+        const haave_sound_t v = {ENGI_FORMANT, d->vox.preset, NO_PATCH, d->vox.level};
         uint32_t i;
-        drift_part(&trk[DRIFT_CHOIR], &v, 84, 120, 100);
+        haave_part(&trk[HAAVE_CHOIR], &v, 84, 120, 100);
         for (i = 0; i < 8u; i++)
-            trk[DRIFT_CHOIR].p[P_E0 + i] = d->vox.e[i];
-        drift_vox_reg = d->vox.reg;
+            trk[HAAVE_CHOIR].p[P_E0 + i] = d->vox.e[i];
+        haave_vox_reg = d->vox.reg;
     }
-    trk[DRIFT_CHOIR].p[P_GLIDE] = 40;
-    trk[DRIFT_CHOIR].p[P_PAN] = -18;
-    drift_root = d->root;
-    drift_minor = d->minor;
-    drift_bpm = d->bpm;
+    trk[HAAVE_CHOIR].p[P_GLIDE] = 40;
+    trk[HAAVE_CHOIR].p[P_PAN] = -18;
+    haave_root = d->root;
+    haave_minor = d->minor;
+    haave_bpm = d->bpm;
     song.g[G_BPM] = d->bpm;                              /* (the delay's 1/4 follows it) */
     song.g[G_RTYPE] = d->rtype;
     song.g[G_RDAMP] = d->rdamp;
     song.g[G_DTIME] = d->dtime;
     song.g[G_DCOLOR] = d->dcolor;
     song.g[G_DMIX] = 90;
-    drift_style = d->style;                              /* where the world starts; ALGORITHM and SELECT turn from there */
-    drift_prog = d->prog;
-    drift_apply();
-    drift_resync = 1;                                    /* (the ISR starts the held notes on the new sounds) */
-    drift_head = 1;
+    haave_style = d->style;                              /* where the world starts; ALGORITHM and SELECT turn from there */
+    haave_prog = d->prog;
+    haave_apply();
+    haave_resync = 1;                                    /* (the ISR starts the held notes on the new sounds) */
+    haave_head = 1;
 }
 
 /* ------------------------------------------------------------- input --- */
-static const uint8_t DRIFT_PUNCH_BTN[DP_NPUNCH] = {B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO};   /* (drift_play.c) */
-static int32_t drift_turn(uint32_t role)                 /* a list knob: one step per turn, whatever its speed */
+static const uint8_t HAAVE_PUNCH_BTN[DP_NPUNCH] = {B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO};   /* (haave_play.c) */
+static int32_t haave_turn(uint32_t role)                 /* a list knob: one step per turn, whatever its speed */
 {
     int32_t s = panel_enc(role);
     return s > 0 ? 1 : s < 0 ? -1 : 0;
 }
 
-static void drift_input(void)
+static void haave_input(void)
 {
     uint32_t pressed = fm1_input_edges(0), i;
     int32_t s;
-    fm1_input_note_edges();                              /* (the keys are drift_play.c's) */
-    if (!drift_ready) {                                  /* first pass: after the boot and any autosave restore */
-        drift_ready = 1;
+    fm1_input_note_edges();                              /* (the keys are haave_play.c's) */
+    if (!haave_ready) {                                  /* first pass: after the boot and any autosave restore */
+        haave_ready = 1;
         perf_latch_on = 0;                               /* (the punch-ins hold while held, whatever was saved) */
         perf_mask = 0;
         for (i = 0; i < DP_NPUNCH; i++)
-            drift_punch_bit[i] = 1u << panel.btn[DRIFT_PUNCH_BTN[i]];
-        drift_load(0);
+            haave_punch_bit[i] = 1u << panel.btn[HAAVE_PUNCH_BTN[i]];
+        haave_load(0);
     }
     for (i = 0; i < DK_N; i++)
         if ((s = panel_enc(EN_K1 + i)) != 0) {
-            int32_t v = drift_knob[i] + 2 * s;
-            drift_knob[i] = (int16_t)(v < 0 ? 0 : v > 127 ? 127 : v);
-            drift_apply();
-            drift_bars |= (uint8_t)(1u << i);
+            int32_t v = haave_knob[i] + 2 * s;
+            haave_knob[i] = (int16_t)(v < 0 ? 0 : v > 127 ? 127 : v);
+            haave_apply();
+            haave_bars |= (uint8_t)(1u << i);
         }
-    if ((s = drift_turn(EN_PRESET)) != 0) {              /* playing: fade out, load at silence, fade in (drift_play.c) */
-        drift_world_next = (uint8_t)(((int32_t)drift_world_next + s + (int32_t)DRIFT_NWORLDS) % (int32_t)DRIFT_NWORLDS);
-        if (drift_on)
-            drift_xf_req = 1;
+    if ((s = haave_turn(EN_PRESET)) != 0) {              /* playing: fade out, load at silence, fade in (haave_play.c) */
+        haave_world_next = (uint8_t)(((int32_t)haave_world_next + s + (int32_t)HAAVE_NWORLDS) % (int32_t)HAAVE_NWORLDS);
+        if (haave_on)
+            haave_xf_req = 1;
         else
-            drift_load(drift_world_next);
-        drift_head = 1;
+            haave_load(haave_world_next);
+        haave_head = 1;
     }
-    if (drift_xf_req && !drift_on && !drift_xf_ready) {  /* stopped during the dip: the new world at once */
-        drift_load(drift_world_next);
-        drift_xf_req = 0;
+    if (haave_xf_req && !haave_on && !haave_xf_ready) {  /* stopped during the dip: the new world at once */
+        haave_load(haave_world_next);
+        haave_xf_req = 0;
     }
-    if (drift_xf_ready) {                                /* silent now: the new world, then the fade back in */
-        drift_load(drift_world_next);
-        drift_xf_in = 1;
-        drift_xf_ready = 0;
-        drift_xf_req = 0;
+    if (haave_xf_ready) {                                /* silent now: the new world, then the fade back in */
+        haave_load(haave_world_next);
+        haave_xf_in = 1;
+        haave_xf_ready = 0;
+        haave_xf_req = 0;
     }
-    if ((s = drift_turn(EN_ALGO)) != 0) {
-        drift_style = (uint8_t)(((int32_t)drift_style + s + DS_N) % DS_N);
-        drift_apply();
-        drift_show = 1;
-        drift_show_ms = fm1_ms;
-        drift_head = 1;
+    if ((s = haave_turn(EN_ALGO)) != 0) {
+        haave_style = (uint8_t)(((int32_t)haave_style + s + DS_N) % DS_N);
+        haave_apply();
+        haave_show = 1;
+        haave_show_ms = fm1_ms;
+        haave_head = 1;
     }
-    if ((s = drift_turn(EN_SELECT)) != 0) {
-        int32_t v = (int32_t)drift_tide + s;             /* TIDE: from STILL to WANDERING (not round) */
-        drift_tide = (uint8_t)(v < 0 ? 0 : v >= DT_N ? DT_N - 1 : v);
-        drift_show = 2;
-        drift_show_ms = fm1_ms;
-        drift_head = 1;
+    if ((s = haave_turn(EN_SELECT)) != 0) {
+        int32_t v = (int32_t)haave_tide + s;             /* TIDE: from STILL to WANDERING (not round) */
+        haave_tide = (uint8_t)(v < 0 ? 0 : v >= DT_N ? DT_N - 1 : v);
+        haave_show = 2;
+        haave_show_ms = fm1_ms;
+        haave_head = 1;
     }
     if ((pressed >> panel.btn[B_PLAY]) & 1u) {
-        drift_run = !drift_run;
-        drift_head = 1;
-        drift_seen++;
+        haave_run = !haave_run;
+        haave_head = 1;
+        haave_seen++;
     }
-    if ((pressed >> panel.btn[B_OCTDN]) & 1u && drift_oct > -1) {
-        drift_oct--;
-        drift_head = 1;
+    if ((pressed >> panel.btn[B_OCTDN]) & 1u && haave_oct > -1) {
+        haave_oct--;
+        haave_head = 1;
     }
-    if ((pressed >> panel.btn[B_OCTUP]) & 1u && drift_oct < 1) {
-        drift_oct++;
-        drift_head = 1;
+    if ((pressed >> panel.btn[B_OCTUP]) & 1u && haave_oct < 1) {
+        haave_oct++;
+        haave_head = 1;
     }
 }
 
 /* -------------------------------------------------------------- LEDs --- */
 /* white keys: lit while their layer plays; black keys: lit while held, and the one whose chord sounds now; every key
  * is dimly lit; PLAY green while the music plays; OCT- / OCT+ lit while shifted */
-static void drift_leds(void)
+static void haave_leds(void)
 {
     uint8_t nl[FM1_NCOL] = {0}, nd[FM1_NCOL] = {0};
     static uint8_t ready;
@@ -332,20 +332,20 @@ static void drift_leds(void)
     for (k = 0; k < 27u; k++) {
         uint32_t p = key_place(k), on;
         if (!key_black(k))
-            on = (drift_layers >> (p % DL_N)) & 1u;
+            on = (haave_layers >> (p % DL_N)) & 1u;
         else
             on = ((fm1_in.notes >> k) & 1u) ||
-                 (drift_run && drift_deg == DRIFT_BLACK[drift_minor & 1u][p % 5u] && drift_bright == (p >= 5u));
+                 (haave_run && haave_deg == HAAVE_BLACK[haave_minor & 1u][p % 5u] && haave_bright == (p >= 5u));
         led_put(nl, 14u + k, (int)on);
         led_put(nd, 14u + k, 1);
     }
-    led_put(nl, panel.btn[B_OCTDN], drift_oct < 0);
-    led_put(nl, panel.btn[B_OCTUP], drift_oct > 0);
-    if (drift_run)
+    led_put(nl, panel.btn[B_OCTDN], haave_oct < 0);
+    led_put(nl, panel.btn[B_OCTUP], haave_oct > 0);
+    if (haave_run)
         nl[LED_PLAY_GREEN >> 3] |= (uint8_t)(1u << (LED_PLAY_GREEN & 7u));
     for (k = 0; k < DP_NPUNCH; k++) {                    /* the punch-in buttons: lit while held, dim otherwise */
-        led_put(nl, panel.btn[DRIFT_PUNCH_BTN[k]], (drift_punch >> k) & 1u);
-        led_put(nd, panel.btn[DRIFT_PUNCH_BTN[k]], 1);
+        led_put(nl, panel.btn[HAAVE_PUNCH_BTN[k]], (haave_punch >> k) & 1u);
+        led_put(nd, panel.btn[HAAVE_PUNCH_BTN[k]], 1);
     }
     fm1_led_dim_level(1);
     for (c = 0; c < FM1_NCOL; c++) {
@@ -357,7 +357,7 @@ static void drift_leds(void)
 }
 
 /* ------------------------------------------------------------ screen --- */
-/* One page, plain (DRIFT.md):
+/* One page, plain (HAAVE.md):
  *     8  the three choices: the world (PRESETS), the progression (SELECT), the behaviour (ALGORITHM)
  *    34  the chord now
  *    60  the seven layers, underlined while on
@@ -378,16 +378,16 @@ static void drift_leds(void)
 #define VIZ_Y 84u
 #define VIZ_H 88u
 
-static const char *const DRIFT_ROMAN[2][7] = {{"I", "II", "III", "IV", "V", "VI", "VII"},
+static const char *const HAAVE_ROMAN[2][7] = {{"I", "II", "III", "IV", "V", "VI", "VII"},
                                               {"i", "ii", "iii", "iv", "v", "vi", "vii"}};
 /* chord d's numeral: upper case for a major triad (a major third above its root in the world's scale), else lower */
-static const char *drift_roman(int32_t d)
+static const char *haave_roman(int32_t d)
 {
-    return DRIFT_ROMAN[drift_step(d + 2) - drift_step(d) != 4][d % 7];
+    return HAAVE_ROMAN[haave_step(d + 2) - haave_step(d) != 4][d % 7];
 }
-static const char *const DRIFT_KEYNAME[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-static const uint16_t DRIFT_KCOL[DK_N] = {D_SKY, D_LILAC, D_ROSE, D_MINT};
-static const uint16_t DRIFT_PCOL[NPART] = {D_SKY, D_PEACH, D_VIOLET, D_LILAC};   /* the parts' lights */
+static const char *const HAAVE_KEYNAME[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+static const uint16_t HAAVE_KCOL[DK_N] = {D_SKY, D_LILAC, D_ROSE, D_MINT};
+static const uint16_t HAAVE_PCOL[NPART] = {D_SKY, D_PEACH, D_VIOLET, D_LILAC};   /* the parts' lights */
 
 /* colour c at strength a / 32 over the background: solid, its tone dimmer for a smaller a (a >= 11: c itself) */
 static uint16_t d_tone(uint16_t c, uint32_t a)
@@ -422,7 +422,7 @@ static void d_disc(int32_t cx, int32_t cy, int32_t r, uint16_t c, uint32_t a)
 }
 
 /* ---- the lights: the sounding voices as solid lights, each world with its own quiet picture behind them and its own
- * way of moving them (one sentence each in DRIFT.md). Lights across by pitch, their size and brightness their level.
+ * way of moving them (one sentence each in HAAVE.md). Lights across by pitch, their size and brightness their level.
  * Only thin dots and lines and solid discs: nothing busy ---- */
 static uint32_t viz_ph;                  /* one step a drawn frame (~30 a second) */
 static int32_t v_sin(uint32_t a, int32_t amp) { return SINE[a & 1023u] * amp / 32768; }
@@ -480,7 +480,7 @@ static void viz_back(void)
 {
     int32_t x, y, w = 240, h = (int32_t)VIZ_H, m = h / 2;
     uint32_t i, r = 0x9E3779B9u;
-    switch (drift_world) {
+    switch (haave_world) {
     case 0:                                              /* GLASS: a thin orbit */
         viz_ring(w / 2, m, 100, 34, D_LILAC, 14);
         break;
@@ -561,7 +561,7 @@ static void viz_back(void)
         break;
     case 2:                                              /* DUSK: the horizon, a slow wave */
     default:                                             /* GARDEN: nothing but the fireflies */
-        if (drift_world == 2u)
+        if (haave_world == 2u)
             for (x = 0; x < w; x += 3)
                 d_dot(x, m + v_sin((uint32_t)x * 6u + viz_ph * 2u, 6), D_LILAC, 7);
         break;
@@ -573,8 +573,8 @@ static int viz_place(uint32_t p, uint32_t i, uint32_t n, int32_t lvl, int32_t *x
 {
     int32_t w = 240, h = (int32_t)VIZ_H, m = h / 2, px = ((int32_t)n - 28) * w / 76;
     uint32_t a = n * 97u + viz_ph * (3u + p);
-    *rad = 5 + lvl / 3 + (p == DRIFT_PAD ? 4 : 0);
-    switch (drift_world) {
+    *rad = 5 + lvl / 3 + (p == HAAVE_PAD ? 4 : 0);
+    switch (haave_world) {
     case 0:                                              /* GLASS: around the orbit */
         a = n * 53u + viz_ph * (2u + p);
         *x = w / 2 + v_sin(a + 256u, 100);
@@ -594,9 +594,9 @@ static int viz_place(uint32_t p, uint32_t i, uint32_t n, int32_t lvl, int32_t *x
         *y = m + 4 - lvl / 4;
         break;
     case 6:                                              /* BOWLS: a bell is a ring opening out; the rest float */
-        if (p == DRIFT_BELL) {
+        if (p == HAAVE_BELL) {
             int32_t rx = 6 + (32 - lvl) * 3;
-            viz_ring(w / 2 + (px - w / 2) / 4, m, rx, rx / 2, DRIFT_PCOL[p], 10u + (uint32_t)lvl / 2u);
+            viz_ring(w / 2 + (px - w / 2) / 4, m, rx, rx / 2, HAAVE_PCOL[p], 10u + (uint32_t)lvl / 2u);
             return 0;
         }
         *x = px;
@@ -616,9 +616,9 @@ static int viz_place(uint32_t p, uint32_t i, uint32_t n, int32_t lvl, int32_t *x
         *y = viz_wave(px, 0) - 4 - lvl / 6;
         break;
     case 10:                                             /* RAIN: a drop landing makes a ring on the surface; the rest float */
-        if (p == DRIFT_BELL) {
+        if (p == HAAVE_BELL) {
             int32_t rx = 3 + (32 - lvl) * 2;
-            viz_ring(px, h - 12, rx, rx / 4 + 1, DRIFT_PCOL[p], 6u + (uint32_t)lvl / 3u);
+            viz_ring(px, h - 12, rx, rx / 4 + 1, HAAVE_PCOL[p], 6u + (uint32_t)lvl / 3u);
             return 0;
         }
         *x = px;
@@ -627,11 +627,11 @@ static int viz_place(uint32_t p, uint32_t i, uint32_t n, int32_t lvl, int32_t *x
     case 11:                                             /* CAVE: a light, and its echoes trailing off smaller and fainter */
         *x = px;
         *y = m + 10 + v_sin(a, 12);
-        d_disc(*x + 14, *y + 6, 2 + lvl / 10, DRIFT_PCOL[p], (uint32_t)lvl / 4u + 2u);
-        d_disc(*x + 26, *y + 11, 1 + lvl / 16, DRIFT_PCOL[p], (uint32_t)lvl / 8u + 1u);
+        d_disc(*x + 14, *y + 6, 2 + lvl / 10, HAAVE_PCOL[p], (uint32_t)lvl / 4u + 2u);
+        d_disc(*x + 26, *y + 11, 1 + lvl / 16, HAAVE_PCOL[p], (uint32_t)lvl / 8u + 1u);
         break;
     case 12: {                                           /* HANDPAN: the note's tone field lights up (the pad: the dome) */
-        uint32_t k = p == DRIFT_PAD ? 0u : 1u + (n * 5u) % 8u;
+        uint32_t k = p == HAAVE_PAD ? 0u : 1u + (n * 5u) % 8u;
         viz_field(k, x, y);
         *rad = 4 + lvl / 3;
         break;
@@ -639,10 +639,10 @@ static int viz_place(uint32_t p, uint32_t i, uint32_t n, int32_t lvl, int32_t *x
     case 13: {                                           /* CRYSTAL: a sparkle on a point of the crystals */
         uint32_t k = (n * 3u + p) % 8u;
         int32_t s = 2 + lvl / 4;
-        uint16_t c = d_tone(DRIFT_PCOL[p], 6u + (uint32_t)lvl / 2u);
+        uint16_t c = d_tone(HAAVE_PCOL[p], 6u + (uint32_t)lvl / 2u);
         cv_line(SPARK[k][0] - s, SPARK[k][1], SPARK[k][0] + s, SPARK[k][1], c);
         cv_line(SPARK[k][0], SPARK[k][1] - s, SPARK[k][0], SPARK[k][1] + s, c);
-        d_disc(SPARK[k][0], SPARK[k][1], 2, DRIFT_PCOL[p], 6u + (uint32_t)lvl / 2u);
+        d_disc(SPARK[k][0], SPARK[k][1], 2, HAAVE_PCOL[p], 6u + (uint32_t)lvl / 2u);
         return 0;
     }
     default:                                             /* DUSK, LOFI: floating on a slow wave */
@@ -655,14 +655,14 @@ static int viz_place(uint32_t p, uint32_t i, uint32_t n, int32_t lvl, int32_t *x
 
 /* the behaviour just turned to, as a picture: a bar of sixteen steps per moving layer, lit where it plays, and the pad's
  * breathing as a curve */
-static void drift_show_rhythm(void)
+static void haave_show_rhythm(void)
 {
     static const char *const ROW[3] = {"ARP", "MEL", "BASS"};
     static const uint8_t PER[6] = {0, 64, 32, 16, 8, 4};   /* the pad's LFO (PAD_BEH sync): sixteenths a cycle */
-    const drift_beh_t *b = &DRIFT_BEH[drift_style % DS_N];
+    const haave_beh_t *b = &HAAVE_BEH[haave_style % DS_N];
     uint32_t r, k;
     int32_t x0 = 56, dx = 11, y;
-    cv_text(8, 2, &AF_M, DRIFT_STYLE[drift_style % DS_N], D_TEXT);
+    cv_text(8, 2, &AF_M, HAAVE_STYLE[haave_style % DS_N], D_TEXT);
     cv_text_r(232, 6, &AF_S, b->half ? "HALF TIME" : "", D_MID, D_BG);
     for (r = 0; r < 3u; r++) {
         y = 30 + (int32_t)r * 14;
@@ -675,15 +675,15 @@ static void drift_show_rhythm(void)
                         : b->mel == MM_BURST ? k == 0u || k == 2u || k == 4u
                         : k == 0u || k == 11u;          /* MM_FLOAT: far apart */
             if (r == 2u && !b->bass_pulse)
-                cv_rect(x0 - 2, y, dx * 16, 2, DRIFT_KCOL[2]);   /* (a held bass: one line) */
+                cv_rect(x0 - 2, y, dx * 16, 2, HAAVE_KCOL[2]);   /* (a held bass: one line) */
             else
-                d_disc(x0 + (int32_t)k * dx, y + 1, on ? 3 : 1, on ? DRIFT_KCOL[r] : D_DIM, 32);
+                d_disc(x0 + (int32_t)k * dx, y + 1, on ? 3 : 1, on ? HAAVE_KCOL[r] : D_DIM, 32);
         }
     }
     y = 72;
     cv_text(8, y - 6, &AF_S, "PAD", D_MID);
     for (k = 0; k < (uint32_t)(dx * 16); k++) {          /* the pad: still, or breathing at its pace */
-        uint32_t per = PER[PAD_BEH[drift_style % DS_N].sync % 6u], a = PAD_BEH[drift_style % DS_N].amp;
+        uint32_t per = PER[PAD_BEH[haave_style % DS_N].sync % 6u], a = PAD_BEH[haave_style % DS_N].amp;
         int32_t yy = per ? y + SINE[(k * 1024u / (per * (uint32_t)dx)) & 1023u] * (int32_t)(2u + a / 12u) / 32768 : y;
         cv_pset(x0 - 2 + (int32_t)k, yy, D_SKY);
     }
@@ -692,15 +692,15 @@ static void drift_show_rhythm(void)
 /* TIDE just turned to, as a picture: water. STILL a flat line, CALM long swells, FLOWING rolling waves, WANDERING
  * choppy ones; the chords of its path sit on the wave as discs (the one now lit, its numeral under it); over FLOWING and
  * WANDERING a few small lights rise and sink: the layers that come and go */
-static void drift_show_path(void)
+static void haave_show_path(void)
 {
     static const uint8_t AMP[DT_N] = {0, 5, 10, 14};    /* the wave: its height .. */
     static const uint16_t LEN[DT_N] = {1, 160, 90, 46};   /* .. and its length (px) */
     static const uint8_t FLOAT[DT_N] = {0, 0, 2, 4};    /* the lights over it */
-    const int8_t *pr = PROG[drift_path()];
-    uint32_t t = drift_tide % DT_N, i, n = 0, ph = viz_ph * (2u + t * 2u);
+    const int8_t *pr = PROG[haave_path()];
+    uint32_t t = haave_tide % DT_N, i, n = 0, ph = viz_ph * (2u + t * 2u);
     int32_t m = (int32_t)VIZ_H / 2 + 6, x;
-    cv_text(8, 2, &AF_M, DRIFT_TIDE[t], D_TEXT);
+    cv_text(8, 2, &AF_M, HAAVE_TIDE[t], D_TEXT);
     for (x = 0; x < 240; x++) {                          /* the water, two pixels thick */
         int32_t y = m + v_sin((uint32_t)x * 1024u / LEN[t] + ph, AMP[t]);
         cv_pset(x, y, D_SKY);
@@ -714,32 +714,32 @@ static void drift_show_path(void)
     for (i = 0; i < n; i++) {
         int32_t cx = n == 1u ? 120 : 30 + (int32_t)(i * 180u / (n - 1u)), cy = m + v_sin((uint32_t)cx * 1024u / LEN[t] + ph,
                                                                                          AMP[t]) - 1;
-        int deg = t == DT_STILL ? (drift_deg < 0 ? pr[0] : drift_deg) : t == DT_WANDER ? -1 : pr[i];
-        int now = deg >= 0 && deg == drift_deg;
+        int deg = t == DT_STILL ? (haave_deg < 0 ? pr[0] : haave_deg) : t == DT_WANDER ? -1 : pr[i];
+        int now = deg >= 0 && deg == haave_deg;
         d_disc(cx, cy, now ? 7 : 5, now ? D_PEACH : D_LILAC, now ? 32u : 18u);
         if (deg >= 0)
-            cv_text(cx - text_w(&AF_S, drift_roman(deg)) / 2, cy + 10, &AF_S, drift_roman(deg), now ? D_TEXT : D_MID);
+            cv_text(cx - text_w(&AF_S, haave_roman(deg)) / 2, cy + 10, &AF_S, haave_roman(deg), now ? D_TEXT : D_MID);
     }
     for (i = 0; i < FLOAT[t]; i++) {                     /* the layers that come and go: lights rising and sinking */
         int32_t lx = 40 + (int32_t)i * 52, ly = m - 18 + v_sin(viz_ph * (5u + i * 2u) + i * 300u, 10);
-        d_disc(lx, ly, 3, DRIFT_KCOL[i % DK_N], 26);
+        d_disc(lx, ly, 3, HAAVE_KCOL[i % DK_N], 26);
     }
 }
 
-static void drift_viz(void)
+static void haave_viz(void)
 {
     uint32_t p, i;
     viz_ph++;
     cv_begin(240, VIZ_H, D_BG);
-    if (drift_show && fm1_ms - drift_show_ms < 2600u) {  /* ALGORITHM or SELECT just turned: their picture a moment */
-        if (drift_show == 1u)
-            drift_show_rhythm();
+    if (haave_show && fm1_ms - haave_show_ms < 2600u) {  /* ALGORITHM or SELECT just turned: their picture a moment */
+        if (haave_show == 1u)
+            haave_show_rhythm();
         else
-            drift_show_path();
+            haave_show_path();
         cv_blit(0, VIZ_Y);
         return;
     }
-    drift_show = 0;
+    haave_show = 0;
     viz_back();
     for (p = 0; p < NPART; p++)
         for (i = 0; i < NVOICE; i++) {
@@ -748,31 +748,31 @@ static void drift_viz(void)
             if (!v->active || (lvl = v->env_out >> 10) < 1)       /* (Q15 -> 0..32) */
                 continue;
             if (viz_place(p, i, v->note, lvl, &x, &y, &rad))
-                d_disc(x, y, 2 + rad / 2, DRIFT_PCOL[p], (uint32_t)(4 + lvl / 4));   /* (dimmer as it fades) */
+                d_disc(x, y, 2 + rad / 2, HAAVE_PCOL[p], (uint32_t)(4 + lvl / 4));   /* (dimmer as it fades) */
         }
     for (p = 0; p < DP_NPUNCH; p++)                      /* a punch-in playing: its name in the middle */
-        if ((drift_punch >> p) & 1u) {
-            int32_t tw = text_w(&AF_M, DRIFT_PUNCH_NAME[p]);
+        if ((haave_punch >> p) & 1u) {
+            int32_t tw = text_w(&AF_M, HAAVE_PUNCH_NAME[p]);
             cv_rrect(120 - tw / 2 - 10, (int32_t)VIZ_H / 2 - 12, tw + 20, 24, -6, D_DIM, D_BG);
-            cv_text_on(120 - tw / 2, (int32_t)VIZ_H / 2 - 9, &AF_M, DRIFT_PUNCH_NAME[p], D_TEXT, D_DIM);
+            cv_text_on(120 - tw / 2, (int32_t)VIZ_H / 2 - 9, &AF_M, HAAVE_PUNCH_NAME[p], D_TEXT, D_DIM);
             break;
         }
     cv_blit(0, VIZ_Y);
 }
 
-static void drift_draw_head(void)
+static void haave_draw_head(void)
 {
     char b[16];
     uint32_t n = 0;
     const char *s;
-    const drift_world_t *w = &DRIFT_WORLDS[drift_world_next];
+    const haave_world_t *w = &HAAVE_WORLDS[haave_world_next];
     cv_begin(240, 24, D_BG);                             /* the three choices */
     cv_text(8, 4, &AF_S, w->name, D_TEXT);
-    cv_text(120 - text_w(&AF_S, DRIFT_TIDE[drift_tide % DT_N]) / 2, 4, &AF_S, DRIFT_TIDE[drift_tide % DT_N], D_TEXT);
-    cv_text_r(232, 4, &AF_S, DRIFT_STYLE[drift_style % DS_N], D_TEXT, D_BG);
+    cv_text(120 - text_w(&AF_S, HAAVE_TIDE[haave_tide % DT_N]) / 2, 4, &AF_S, HAAVE_TIDE[haave_tide % DT_N], D_TEXT);
+    cv_text_r(232, 4, &AF_S, HAAVE_STYLE[haave_style % DS_N], D_TEXT, D_BG);
     cv_rect(8, 22, 224, 1, D_DIM);
     cv_blit(0, 4);
-    for (s = DRIFT_KEYNAME[w->root % 12u]; *s; s++)     /* key and tempo, octave */
+    for (s = HAAVE_KEYNAME[w->root % 12u]; *s; s++)     /* key and tempo, octave */
         b[n++] = *s;
     for (s = w->minor ? " MINOR  " : " MAJOR  "; *s; s++)
         b[n++] = *s;
@@ -783,29 +783,29 @@ static void drift_draw_head(void)
     b[n] = 0;
     cv_begin(240, 15, D_BG);
     cv_text(8, 0, &AF_S, b, D_MID);
-    cv_text_r(232, 0, &AF_S, drift_oct < 0 ? "OCT -1" : drift_oct > 0 ? "OCT +1" : "", D_MID, D_BG);
+    cv_text_r(232, 0, &AF_S, haave_oct < 0 ? "OCT -1" : haave_oct > 0 ? "OCT +1" : "", D_MID, D_BG);
     cv_blit(0, 222);
 }
 
-static void drift_draw_chord(void)
+static void haave_draw_chord(void)
 {
     char b[24];
     uint32_t n = 0, i;
     const char *s;
-    if (!drift_run || drift_deg < 0)
+    if (!haave_run || haave_deg < 0)
         draw_text_line(0, 34, 240, &AF_M, "PRESS PLAY", D_MID, D_BG, 1);
     else {
-        for (s = drift_roman(drift_deg); *s; s++)
+        for (s = haave_roman(haave_deg); *s; s++)
             b[n++] = *s;
-        for (s = drift_bright ? " add9" : ""; *s; s++)
+        for (s = haave_bright ? " add9" : ""; *s; s++)
             b[n++] = *s;
         b[n] = 0;
         draw_text_line(0, 34, 240, &AF_M, b, D_TEXT, D_BG, 1);
     }
     cv_begin(240, 24, D_BG);                             /* the layers, underlined while on */
     for (i = 0; i < DL_N; i++) {
-        uint32_t on = (drift_layers >> i) & 1u, x = 2u + i * 34u;
-        cv_text((int32_t)(x + 17u) - text_w(&AF_S, DRIFT_LAYER[i]) / 2, 0, &AF_S, DRIFT_LAYER[i],
+        uint32_t on = (haave_layers >> i) & 1u, x = 2u + i * 34u;
+        cv_text((int32_t)(x + 17u) - text_w(&AF_S, HAAVE_LAYER[i]) / 2, 0, &AF_S, HAAVE_LAYER[i],
                 on ? D_TEXT : D_DIM);
         if (on)
             cv_rrect((int32_t)x + 7, 18, 20, 3, -1, D_PEACH, D_BG);
@@ -814,61 +814,61 @@ static void drift_draw_chord(void)
 }
 
 /* a knob: its name, a solid bar, its value */
-static void drift_draw_bar(uint32_t i)
+static void haave_draw_bar(uint32_t i)
 {
-    int32_t w = 56, f = drift_knob[i] * (w - 8) / 127 + 4;
+    int32_t w = 56, f = haave_knob[i] * (w - 8) / 127 + 4;
     char b[4];
-    uint32_t v = (uint32_t)drift_knob[i] * 100u / 127u;
+    uint32_t v = (uint32_t)haave_knob[i] * 100u / 127u;
     cv_begin((uint32_t)w, 46, D_BG);
-    cv_text(w / 2 - text_w(&AF_S, DRIFT_KNOB[i]) / 2, 0, &AF_S, DRIFT_KNOB[i], D_MID);
+    cv_text(w / 2 - text_w(&AF_S, HAAVE_KNOB[i]) / 2, 0, &AF_S, HAAVE_KNOB[i], D_MID);
     cv_rrect(4, 20, w - 8, 6, -3, D_DIM, D_BG);          /* the track */
-    cv_rrect(4, 20, f - 4, 6, -3, DRIFT_KCOL[i], D_DIM); /* the value */
+    cv_rrect(4, 20, f - 4, 6, -3, HAAVE_KCOL[i], D_DIM); /* the value */
     b[0] = (char)(v >= 100u ? '1' : '0' + v / 10u);
     b[1] = (char)(v >= 100u ? '0' : '0' + v % 10u);
     b[2] = v >= 100u ? '0' : 0;
     b[3] = 0;
-    cv_text(w / 2 - text_w(&AF_S, v < 10u ? b + 1 : b) / 2, 31, &AF_S, v < 10u ? b + 1 : b, DRIFT_KCOL[i]);
+    cv_text(w / 2 - text_w(&AF_S, v < 10u ? b + 1 : b) / 2, 31, &AF_S, v < 10u ? b + 1 : b, HAAVE_KCOL[i]);
     cv_blit(6u + i * 58u, 174);
 }
 
-/* the splash (main.c, in place of Felucca's): a soft planet, DRIFT, a line */
-static void drift_splash(void)
+/* the splash (main.c, in place of Felucca's): a planet, HAAVE, a line */
+static void haave_splash(void)
 {
     lcd_fill(0, 0, 240, 240, D_BG);
     cv_begin(240, 120, D_BG);
     d_disc(120, 40, 22, D_SKY, 32);                      /* a planet, two moons */
     d_disc(156, 24, 5, D_ROSE, 32);
     d_disc(82, 56, 3, D_MINT, 32);
-    cv_text(120 - text_w(&AF_L, "DRIFT") / 2, 72, &AF_L, "DRIFT", D_TEXT);
+    cv_text(120 - text_w(&AF_L, "HAAVE") / 2, 72, &AF_L, "HAAVE", D_TEXT);
     cv_blit(0, 46);
     draw_text_line(0, 176, 240, &AF_S, "DREAM FIRMWARE FOR THE FM-1", D_MID, D_BG, 1);
     draw_text_line(0, 196, 240, &AF_S, FELUCCA_VERSION, D_DIM, D_BG, 1);
 }
 
-static void drift_draw(void)
+static void haave_draw(void)
 {
     static uint8_t seen = 0xFF, frame;
     uint32_t i;
-    if (drift_redraw) {
+    if (haave_redraw) {
         lcd_fill(0, 0, 240, 240, D_BG);
-        drift_redraw = 0;
-        drift_head = 1;
-        drift_bars = 0xF;
-        seen = (uint8_t)(drift_seen + 1u);
+        haave_redraw = 0;
+        haave_head = 1;
+        haave_bars = 0xF;
+        seen = (uint8_t)(haave_seen + 1u);
     }
-    if (drift_head) {
-        drift_head = 0;
-        drift_draw_head();
+    if (haave_head) {
+        haave_head = 0;
+        haave_draw_head();
     }
     for (i = 0; i < DK_N; i++)
-        if ((drift_bars >> i) & 1u) {
-            drift_bars &= (uint8_t)~(1u << i);
-            drift_draw_bar(i);
+        if ((haave_bars >> i) & 1u) {
+            haave_bars &= (uint8_t)~(1u << i);
+            haave_draw_bar(i);
         }
-    if (seen != drift_seen) {
-        seen = drift_seen;
-        drift_draw_chord();
+    if (seen != haave_seen) {
+        seen = haave_seen;
+        haave_draw_chord();
     }
     if (++frame & 1u)
-        drift_viz();
+        haave_viz();
 }
