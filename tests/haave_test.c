@@ -61,6 +61,8 @@ static void reset(void) { pk = s2 = s1 = jump = 0; nf = 0; }
 static double db(double x) { return 20.0 * log10(x + 1e-12); }
 static double rms(void) { return nf ? sqrt(s2 / nf) : 0; }
 static const uint8_t WHITE[7] = {0, 2, 4, 6, 7, 9, 11}, BLACK[10] = {1, 3, 5, 8, 10, 13, 15, 17, 20, 22};
+static const uint8_t PLAYK[8] = {12, 16, 18, 19, 21, 23, 24, 26};   /* GONG and the seven PLAY keys (BASS: 14) */
+#define HELD (0x252A52Au | 1u << 14)             /* the keys a press holds: the chords and BASS */
 static void press(uint32_t mask) { web_keys(mask); run(30); }
 static void button(uint32_t b) { web_buttons(1u << b); run(20); web_buttons(0); run(20); }
 
@@ -101,6 +103,7 @@ static void matrix(void)
 /* 3: every punch-in in every world, all layers on: held 4 s, then let go: no clipping, no click, and the level within
  * a few dB of the sound without it (WASH and SHIMMER add, UNDERWATER takes away, none may jump) */
 static const uint8_t PUNCH_BTN[DP_NPUNCH] = {B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO};
+static const uint8_t MOMENT_BTN[DM_N] = {B_SEQ, B_SAVE, B_ARP, B_HOME};
 static void punches(void)
 {
     uint32_t w, k;
@@ -146,8 +149,12 @@ static void restless(uint32_t minutes)
         uint32_t a = rnd(100), dt = 50u + rnd(2500);
         if (a < 6)
             button(B_PLAY);
-        else if (a < 30)
+        else if (a < 22)
             keys ^= 1u << WHITE[rnd(7)];                 /* a layer: press and let go */
+        else if (a < 28)
+            keys ^= 1u << PLAYK[rnd(8)];                 /* GONG or a note: a tap */
+        else if (a < 30)
+            keys ^= 1u << 14;                            /* BASS: held, or let go */
         else if (a < 45)
             keys = (keys & ~0x252A52Au) | 1u << BLACK[rnd(10)];   /* a chord: held for a while */
         else if (a < 55)
@@ -162,13 +169,15 @@ static void restless(uint32_t minutes)
             web_enc(EN_SELECT, rnd(2) ? 1 : -1);
         else if (a < 97)
             button(rnd(2) ? B_OCTUP : B_OCTDN);
+        else if (a < 98)
+            button(MOMENT_BTN[rnd(DM_N)]);               /* a moment */
         else {                                           /* a punch-in, held for a while */
             web_buttons(1u << PUNCH_BTN[rnd(DP_NPUNCH)]);
             run(300.0 + rnd(3000));
             web_buttons(0);
         }
         press(keys);
-        keys &= 0x252A52Au;                              /* (white keys: a tap) */
+        keys &= HELD;                                    /* (the other white keys: a tap) */
         press(keys);
         {
             double before = s2;
@@ -283,6 +292,66 @@ static void fades(void)
     CHECK(r[1] < -60.0, "stop: still %.1f dBFS 30..40 s later", r[1]);
 }
 
+/* 5: the playing keys and the moments, in every world: the PLAY keys' notes rise and fit the chord whatever it is;
+ * GONG and BASS sound; each moment starts, plays out and gives the layers back as they were, GLOW back at 0, no clipping */
+static void playing(void)
+{
+    uint32_t w, m, i, d, bad = 0, gave = 0;
+    printf("-- the PLAY keys and the moments\n");
+    for (d = 0; d < 7u; d++)
+        for (i = 0; i < 2u; i++) {
+            uint32_t k, last = 0;
+            haave_cur = (int8_t)d;
+            haave_bright = (uint8_t)i;
+            for (k = 0; k < 7u; k++) {
+                uint32_t n = haave_key_note(k);
+                bad += !haave_fits((int32_t)n) || n <= last || n > 96u;
+                last = n;
+            }
+        }
+    CHECK(!bad, "the PLAY keys: %u notes out of the chord, not rising or above C7", bad);
+    haave_tide = DT_CALM;                                /* (TIDE's layer changes would muddle the check) */
+    button(B_PLAY);
+    for (w = 0; w < HAAVE_NWORLDS; w++) {
+        web_enc(EN_PRESET, 1);
+        run(5000);
+        haave_layers = 1u << DL_PAD | 1u << DL_MELODY;
+        haave_voice_held();
+        reset();
+        press(1u << 12);                                 /* GONG */
+        press(0);
+        press(1u << 14);                                 /* BASS, held a second */
+        run(1000);
+        press(0);
+        for (i = 0; i < 7u; i++) {                       /* a run up the PLAY keys */
+            press(1u << PLAYK[1u + i]);
+            press(0);
+            run(150);
+        }
+        run(1500);
+        CHECK(pk < 0.9 && pk > 0.003, "%s: the keys peak at %.3f", HAAVE_WORLDS[w].name, pk);
+        for (m = 0; m < DM_N; m++) {
+            uint8_t before = haave_layers;
+            int seen = 0;
+            reset();
+            button(MOMENT_BTN[m]);
+            for (i = 0; i < 400u && (haave_mom >= 0 || haave_mom_req != 0xFF || !seen); i++) {
+                seen |= haave_mom == (int8_t)m;
+                run(250);
+            }
+            gave += seen && haave_mom < 0 && haave_layers == before && haave_mom_glow == 0;
+            CHECK(seen, "%s: %s never started", HAAVE_WORLDS[w].name, HAAVE_MOMENT[m]);
+            CHECK(haave_mom < 0, "%s: %s never ended", HAAVE_WORLDS[w].name, HAAVE_MOMENT[m]);
+            CHECK(haave_layers == before, "%s: %s left the layers %02x (were %02x)", HAAVE_WORLDS[w].name,
+                  HAAVE_MOMENT[m], haave_layers, before);
+            CHECK(pk < 0.9 && jump < 0.3, "%s: %s peaks %.3f, step %.3f", HAAVE_WORLDS[w].name, HAAVE_MOMENT[m], pk, jump);
+        }
+    }
+    printf("  %u of %u moments played out and gave the music back\n", gave, HAAVE_NWORLDS * DM_N);
+    button(B_PLAY);
+    run(3000);
+}
+
 int main(int argc, char **argv)
 {
     uint32_t minutes = argc > 1 ? (uint32_t)atoi(argv[1]) : 30u;
@@ -294,6 +363,7 @@ int main(int argc, char **argv)
     matrix();
     tide();
     punches();
+    playing();
     restless(minutes);
     CHECK(bad_note == 0, "%u voice blocks with a note out of range (bass from 28, voice 40..72, bells to 96, all to 108)", bad_note);
     CHECK(too_many == 0, "%u blocks with more than %u voices", too_many, NVOICE);

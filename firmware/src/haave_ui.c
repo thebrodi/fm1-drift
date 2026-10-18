@@ -133,7 +133,9 @@ static const struct { uint8_t sync, wave, amp, atk; int8_t glow; } PAD_BEH[DS_N]
 static void haave_apply(void)
 {
     track_t *pad = &trk[HAAVE_PAD], *bell = &trk[HAAVE_BELL], *bass = &trk[HAAVE_BASS], *choir = &trk[HAAVE_CHOIR];
-    int32_t sp = haave_knob[DK_SPACE], ec = haave_knob[DK_ECHO], gl = haave_knob[DK_GLOW], mo = haave_knob[DK_MOTION];
+    int32_t sp = haave_knob[DK_SPACE], ec = haave_knob[DK_ECHO], gl = haave_knob[DK_GLOW] + haave_mom_glow,
+            mo = haave_knob[DK_MOTION];
+    gl = gl < 0 ? 0 : gl > 127 ? 127 : gl;
     int32_t pg = gl + PAD_BEH[haave_style % DS_N].glow;
     pad->p[P_LSYNC] = PAD_BEH[haave_style % DS_N].sync;
     pad->p[P_LWAVE] = PAD_BEH[haave_style % DS_N].wave;
@@ -158,6 +160,21 @@ static void haave_apply(void)
     haave_glow(bell, gl);
     pad->p[P_CHOR] = (int16_t)mo;
     choir->p[P_CHOR] = (int16_t)(mo / 2);
+    pad->p[P_LD_FLT] = (int16_t)(mo / (pad->eng_req == ENGI_FM6 ? 2 : pad->eng_req == ENGI_NOISE ? 8 : 6));   /* MOTION:
+                                                     * the pad's tone sways with its breath (CHIME: slowly by itself) */
+    pad->p[P_LD_AMP] = (int16_t)(pad->p[P_LD_AMP] + mo / 5);   /* .. and breathes deeper */
+    if (!pad->p[P_LSYNC])
+        pad->p[P_LRATE] = 18;
+    {   /* GLOW: the tails too, darker or airier (the world's room as the middle); SPACE and ECHO: further away, not
+         * louder (haave_play.c haave_gain_block: -4 dB with all SPACE, -1.5 dB with all ECHO) */
+        const haave_world_t *w = &HAAVE_WORLDS[haave_world % HAAVE_NWORLDS];
+        int32_t rd = w->rdamp + (64 - gl) / 2, dc = w->dcolor + (gl - 64) / 2;
+        song.g[G_RDAMP] = (int16_t)(rd < 0 ? 0 : rd > 127 ? 127 : rd);
+        song.g[G_DCOLOR] = (int16_t)(dc < 0 ? 0 : dc > 127 ? 127 : dc);
+        haave_trim_to = DG_ONE - (int32_t)((int64_t)DG_ONE * ((sp * sp * 369 + ec * ec * 159) / 100 - 35613) / 161290);
+                                                         /* (as loud as ever at the knobs' start, SPACE 90 ECHO 60; in
+                                                          * hundreds: -3561300 reads as a ROM address to build.py) */
+    }
     if (pad->eng_req == ENGI_FM6)
         pad->p[P_E0 + 6] = (int16_t)(mo * 3 / 4);        /* FM6 DTUN: the operators drift apart */
     pad->p[P_SPRD] = (int16_t)(20 + mo * 3 / 4);
@@ -204,9 +221,12 @@ static void haave_load(uint32_t w)
             t->p[P_E0 + 3] = 10;                         /* RES */
             t->p[P_E0 + 6] = 60;                         /* DRFT */
         }
-        if (d->part[0].preset == NZ_RAIN) {             /* softer drops: lower and rounder (no crackle) */
-            t->p[P_E0 + 2] = haave_cut[HAAVE_PAD] = 62;  /* FREQ */
-            t->p[P_E0 + 3] = 70;                         /* RES */
+        if (d->part[0].preset == NZ_RAIN) {             /* soft drops: dark, round and a little sparser (no scratch:
+                                                         * as bright as OCEAN, 15 dB below the preset's) */
+            t->p[P_E0 + 1] = 100;                        /* COLR: towards brown */
+            t->p[P_E0 + 2] = haave_cut[HAAVE_PAD] = 55;  /* FREQ */
+            t->p[P_E0 + 3] = 40;                         /* RES */
+            t->p[P_E0 + 5] = 90;                         /* DENS */
         }
     }
     haave_reg = d->reg;
@@ -242,6 +262,7 @@ static void haave_load(uint32_t w)
 
 /* ------------------------------------------------------------- input --- */
 static const uint8_t HAAVE_PUNCH_BTN[DP_NPUNCH] = {B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO};   /* (haave_play.c) */
+static const uint8_t HAAVE_MOMENT_BTN[DM_N] = {B_SEQ, B_SAVE, B_ARP, B_HOME};   /* SWELL BREATHE CASCADE HOME */
 static int32_t haave_turn(uint32_t role)                 /* a list knob: one step per turn, whatever its speed */
 {
     int32_t s = panel_enc(role);
@@ -259,6 +280,8 @@ static void haave_input(void)
         perf_mask = 0;
         for (i = 0; i < DP_NPUNCH; i++)
             haave_punch_bit[i] = 1u << panel.btn[HAAVE_PUNCH_BTN[i]];
+        for (i = 0; i < DM_N; i++)
+            haave_mom_bit[i] = 1u << panel.btn[HAAVE_MOMENT_BTN[i]];
         haave_load(0);
     }
     for (i = 0; i < DK_N; i++)
@@ -268,6 +291,13 @@ static void haave_input(void)
             haave_apply();
             haave_bars |= (uint8_t)(1u << i);
         }
+    {   /* a moment's GLOW moved */
+        static int8_t g;
+        if (g != haave_mom_glow) {
+            g = haave_mom_glow;
+            haave_apply();
+        }
+    }
     if ((s = haave_turn(EN_PRESET)) != 0) {              /* playing: fade out, load at silence, fade in (haave_play.c) */
         haave_world_next = (uint8_t)(((int32_t)haave_world_next + s + (int32_t)HAAVE_NWORLDS) % (int32_t)HAAVE_NWORLDS);
         if (haave_on)
@@ -320,7 +350,7 @@ static void haave_input(void)
  * is dimly lit; PLAY green while the music plays; OCT- / OCT+ lit while shifted */
 static void haave_leds(void)
 {
-    uint8_t nl[FM1_NCOL] = {0}, nd[FM1_NCOL] = {0};
+    uint8_t nl[FM1_NCOL] = {0}, nd[FM1_NCOL] = {0}, nm[FM1_NCOL] = {0}, nb[FM1_NCOL] = {0};
     static uint8_t ready;
     uint32_t k, c;
     if (fm1_led_anim_on())
@@ -331,18 +361,24 @@ static void haave_leds(void)
     }
     for (k = 0; k < 27u; k++) {
         uint32_t p = key_place(k), on;
-        if (!key_black(k))
-            on = (haave_layers >> (p % DL_N)) & 1u;
+        if (!key_black(k))                               /* a layer: lit while on; GONG BASS and the PLAY keys: as held */
+            on = p < DL_N ? (haave_layers >> p) & 1u : (fm1_in.notes >> k) & 1u;
         else
             on = ((fm1_in.notes >> k) & 1u) ||
                  (haave_run && haave_deg == HAAVE_BLACK[haave_minor & 1u][p % 5u] && haave_bright == (p >= 5u));
         led_put(nl, 14u + k, (int)on);
-        led_put(nd, 14u + k, 1);
+        led_put(p >= DW_GONG && p < DW_PLAY && !key_black(k) ? nm : nd, 14u + k, 1);   /* (GONG, BASS: brighter) */
     }
     led_put(nl, panel.btn[B_OCTDN], haave_oct < 0);
     led_put(nl, panel.btn[B_OCTUP], haave_oct > 0);
     if (haave_run)
         nl[LED_PLAY_GREEN >> 3] |= (uint8_t)(1u << (LED_PLAY_GREEN & 7u));
+    else
+        led_put(nb, panel.btn[B_PLAY], 1);               /* stopped: PLAY breathes, press me */
+    for (k = 0; k < DM_N; k++) {                         /* the moment buttons: lit while theirs plays, dim otherwise */
+        led_put(nl, panel.btn[HAAVE_MOMENT_BTN[k]], haave_mom == (int8_t)k);
+        led_put(nd, panel.btn[HAAVE_MOMENT_BTN[k]], 1);
+    }
     for (k = 0; k < DP_NPUNCH; k++) {                    /* the punch-in buttons: lit while held, dim otherwise */
         led_put(nl, panel.btn[HAAVE_PUNCH_BTN[k]], (haave_punch >> k) & 1u);
         led_put(nd, panel.btn[HAAVE_PUNCH_BTN[k]], 1);
@@ -350,8 +386,8 @@ static void haave_leds(void)
     fm1_led_dim_level(1);
     for (c = 0; c < FM1_NCOL; c++) {
         fm1_led_dim[c] = (uint8_t)(nd[c] & ~nl[c]);
-        fm1_led_breath[c] = 0;
-        fm1_led_mid[c] = 0;
+        fm1_led_breath[c] = nb[c];
+        fm1_led_mid[c] = (uint8_t)(nm[c] & ~nl[c]);
         fm1_led[c] = nl[c];
     }
 }
@@ -750,13 +786,19 @@ static void haave_viz(void)
             if (viz_place(p, i, v->note, lvl, &x, &y, &rad))
                 d_disc(x, y, 2 + rad / 2, HAAVE_PCOL[p], (uint32_t)(4 + lvl / 4));   /* (dimmer as it fades) */
         }
-    for (p = 0; p < DP_NPUNCH; p++)                      /* a punch-in playing: its name in the middle */
-        if ((haave_punch >> p) & 1u) {
-            int32_t tw = text_w(&AF_M, HAAVE_PUNCH_NAME[p]);
+    {   /* a punch-in playing, else a moment: its name in the middle */
+        const char *nm = haave_mom >= 0 ? HAAVE_MOMENT[haave_mom % DM_N] : 0;
+        for (p = 0; p < DP_NPUNCH; p++)
+            if ((haave_punch >> p) & 1u) {
+                nm = HAAVE_PUNCH_NAME[p];
+                break;
+            }
+        if (nm) {
+            int32_t tw = text_w(&AF_M, nm);
             cv_rrect(120 - tw / 2 - 10, (int32_t)VIZ_H / 2 - 12, tw + 20, 24, -6, D_DIM, D_BG);
-            cv_text_on(120 - tw / 2, (int32_t)VIZ_H / 2 - 9, &AF_M, HAAVE_PUNCH_NAME[p], D_TEXT, D_DIM);
-            break;
+            cv_text_on(120 - tw / 2, (int32_t)VIZ_H / 2 - 9, &AF_M, nm, D_TEXT, D_DIM);
         }
+    }
     cv_blit(0, VIZ_Y);
 }
 

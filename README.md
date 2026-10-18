@@ -25,18 +25,21 @@ If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelto
 
 | Control | Does |
 |---|---|
-| **PLAY** | Starts / stops the music (fade by hand with the MASTER knob) |
-| **KNOB 1 — Space** | Reverb, from a small room to a huge hall |
-| **KNOB 2 — Echo** | Delay repeats |
-| **KNOB 3 — Glow** | Dark and warm → bright and glassy |
-| **KNOB 4 — Motion** | Still and sparse → busy and moving |
-| **White keys** | Layers on / off (lit = playing): PAD, BASS, ARP, SPARKLE, MELODY, VOX, SHIMMER |
+| **PLAY** | Starts / stops the music (it breathes while stopped; fade by hand with the MASTER knob) |
+| **KNOB 1 — Space** | Reverb, from close and dry to far away in a huge hall |
+| **KNOB 2 — Echo** | Delay repeats, from none to long trails |
+| **KNOB 3 — Glow** | Dark and warm → bright and glassy, the reverb and echo tails too |
+| **KNOB 4 — Motion** | Still and sparse → busy and moving, the pad swaying and breathing deeper |
+| **White keys 1–7** | Layers on / off (lit = playing): PAD, BASS, ARP, SPARKLE, MELODY, VOX, SHIMMER |
+| **White keys 8–9** | GONG (a deep hit of the world's bell) and BASS (the chord's root, held while you hold the key) |
+| **White keys 10–16** | Play along: the notes of the chord sounding now, going up, in the world's bell. Never a wrong note |
 | **Black keys** | Chords to move to (vi ii IV V I, then the same with a soft colour): press to go there |
 | **PRESETS** | The world: GLASS, EMBER, DUSK, NIGHT, NEON, LOFI, BOWLS, GARDEN, FOREST, OCEAN, RAIN, CAVE, HANDPAN, CRYSTAL |
 | **ALGORITHM** | The behaviour: DRIFT, RIPPLE, SWELL, CHIME, PULSE |
 | **SELECT** | TIDE, how much it moves by itself: STILL, CALM, FLOWING (layers come and go now and then), WANDERING |
 | **OCT− / OCT+** | Everything an octave down / up |
 | **FX SCL ENV LFO EDIT GLO** | Punch-in effects while held, on the beat: echoes, stutter, freeze, shimmer, underwater, wash |
+| **HOME SAVE ARP SEQ** | Moments, one press each, from the next beat: HOME lands on the first chord with the gong, SAVE breathes (only the pad, darker, for 2 bars), ARP a cascade of falling bell notes, SEQ a swell (every layer joins and it opens up, 4 bars). Each gives the music back as it was |
 
 The worlds range from glassy bells and warm electric piano to a dark minor pad, 80s strings, lo-fi keys, a singing
 bowl over a drone, a kalimba, a soft flute, ocean waves and rain (brown noise), a deep cave, a handpan and crystal

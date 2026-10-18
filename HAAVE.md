@@ -31,19 +31,22 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 
 | Control | Does |
 |---|---|
-| **PLAY** | Starts / stops the music; stopped, everything rings out (fade by hand with the MASTER knob) |
-| **KNOB 1 — Space** | Reverb: dry and close → a vast hall |
-| **KNOB 2 — Echo** | Delay: none → long repeating trails |
-| **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness, the analog pads' filter; the bells half as much) |
-| **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play: ×0.2 … ×2.2; chorus and drift) |
-| **White keys** | Toggle the 7 layers, lit while on (the pattern repeats across the keyboard) |
+| **PLAY** | Starts / stops the music; stopped, everything rings out and PLAY breathes (fade by hand with the MASTER knob) |
+| **KNOB 1 — Space** | Reverb: dry and close → a vast hall; the whole a little quieter as it grows (about 4 dB over the turn), so it moves away rather than getting louder |
+| **KNOB 2 — Echo** | Delay: none → long repeating trails (1.5 dB quieter over the turn, the same idea) |
+| **KNOB 3 — Glow** | Dark and warm → bright and glassy (FM brightness, the analog pads' filter; the bells half as much; the reverb's damping and the echo's colour around the world's own) |
+| **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play: ×0.2 … ×2.2; chorus and drift; the pad's tone sways with its breath, and it breathes deeper) |
+| **White keys 1–7** | Toggle the 7 layers, lit while on |
+| **White keys 8–9** | GONG and BASS (below), a little brighter than the rest |
+| **White keys 10–16** | PLAY keys: the chord's tones going up (below) |
 | **Black keys** | Chords to move to: press = go there; the chord lasts as long as TIDE's chords do (STILL: until the next press) |
 | **PRESETS** knob | The world: the sounds, the key and the tempo. Playing, a change dips out (1.5 s) and back in (2.5 s): no cut |
 | **ALGORITHM** knob | The behaviour: how every layer plays (DRIFT, RIPPLE, SWELL, CHIME, PULSE); its rhythm shown a moment |
 | **SELECT** knob | TIDE: how much the music moves by itself (STILL, CALM, FLOWING, WANDERING); shown a moment |
 | **OCT− / OCT+** | Everything an octave down / up |
 | **FX SCL ENV LFO EDIT GLO** | Punch-in effects on the whole sound while held (below) |
-| Other buttons | Unused |
+| **HOME SAVE ARP SEQ** | Moments: one press, it plays itself out (below) |
+| REC | Unused |
 
 ### Layers (white keys, from the left)
 
@@ -59,6 +62,31 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 
 PAD and MELODY are on at power-on. The FM-1 sounds 8 voices at once across 4 parts, so the layers
 share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), VOX (part 4).
+
+### Playing along (white keys 8–16)
+
+The right part of the keyboard plays over the music, with the world's own sounds, and every note fits:
+
+| Key | Plays |
+|---|---|
+| 8 | GONG: the chord's root low on the world's bell, its octave softly above |
+| 9 | BASS: the chord's root on the bass, held while the key is (the BASS layer's note struck again if it plays) |
+| 10–16 | The chord's three tones from about C4 up, then again an octave higher, and the lowest once more two octaves up: seven notes going up. They follow the chord: press a black key and the same keys play the new chord |
+
+They light while held, and they play when the music is stopped too.
+
+### Moments (HOME SAVE ARP SEQ)
+
+One press, and the moment starts on the next beat, plays itself out and gives the music back as it was (a layer
+toggled meanwhile is kept). The button lights and the name shows on the screen while it plays; a press during
+another moment ends that one. TIDE leaves the layers alone meanwhile. Stopped, they do nothing.
+
+| Button | Moment |
+|---|---|
+| HOME | HOME: back to the path's first chord, landing with the gong and the bass (a bar) |
+| SAVE | BREATHE: only the pad, a little darker, then everything returns (2 bars) |
+| ARP | CASCADE: twelve bell notes falling down the chord from two octaves up, softer as they go (a bar) |
+| SEQ | SWELL: the layers join one a beat and it opens up (GLOW +32 at the top), then they go again (4 bars) |
 
 ### Punch-in effects (FX SCL ENV LFO EDIT GLO)
 
