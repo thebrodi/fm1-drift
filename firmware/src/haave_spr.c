@@ -43,6 +43,9 @@ typedef struct {
     int32_t e, de, r, dr;                /* the envelope: now, its step in the attack; the fall's 1 .. 0 and its step */
     uint32_t ph, inc, rng;               /* the sine: phase, step (a block at a time); the noise */
     int32_t f, q, lo, bp;                /* the band-pass (a state-variable filter): frequency, damping (Q15), state */
+    int32_t ca, c1, cb, c2;              /* the noise darkened before it (a one-pole low-pass, Q15; 32768: none) and
+                                          * after it, their states */
+    uint8_t lpo;                         /* 1: the filter's low-pass out (a rumble, a surf: 12 dB an octave above) */
     uint32_t vph;                        /* GULL: its vibrato's phase */
     int32_t note;                        /* the event's tone (the bells, BUBBLES' climb) */
 } haave_spr_t;
@@ -180,6 +183,8 @@ static int haave_spr_event(haave_spr_t *v, int first)
         v->p0 = 450;
         v->p1 = 900;
         v->q = 36000;
+        v->ca = 5000;                                    /* (pink-dark noise, the low-pass out: a surf, no hiss) */
+        v->lpo = 1;
         v->len = SPR_MS(3200);
         v->atk = SPR_MS(1300);
         v->amp = 17000;
@@ -193,6 +198,8 @@ static int haave_spr_event(haave_spr_t *v, int first)
         v->p0 = 700;
         v->p1 = 1500;
         v->q = 12000;
+        v->ca = 4000;                                    /* (darker noise in, softened after: no hiss over it) */
+        v->cb = 6000;
         v->len = SPR_MS(2800);
         v->atk = SPR_MS(1100);
         v->amp = 11000;
@@ -205,6 +212,8 @@ static int haave_spr_event(haave_spr_t *v, int first)
         v->k = K_NOISE;
         v->p0 = v->p1 = (int32_t)haave_spr_r(110, 200);
         v->q = 30000;
+        v->ca = 1500;                                    /* (brown noise, the low-pass out: a rumble, nothing above) */
+        v->lpo = 1;
         v->len = SPR_MS(haave_spr_r(900, 1600));
         v->atk = SPR_MS(150);
         v->amp = 24000 - 5000 * (2 - v->ev);
@@ -294,7 +303,7 @@ static void haave_spr_key(uint32_t k)
 /* fx.c: a block of the sprinkles into the dry mix (l, r) and the echo's and reverb's sends (sd, sv); each kind at its
  * level beside the music (Q8: noise through a narrow band, sparse specks and low rumbles need more than a sine) */
 #define SPR_GAIN 36000
-static const uint16_t SPR_KIND_GAIN[HS_N] = {256, 256, 230, 720, 640, 256, 256, 320, 2600, 1020, 450, 2040, 510,
+static const uint16_t SPR_KIND_GAIN[HS_N] = {256, 256, 230, 720, 640, 256, 256, 320, 2600, 1020, 750, 2040, 510,
                                              256, 256, 256};
 static void haave_spr_mix(int32_t *l, int32_t *r, int32_t *sd, int32_t *sv, uint32_t n)
 {
@@ -343,6 +352,10 @@ static void haave_spr_mix(int32_t *l, int32_t *r, int32_t *sd, int32_t *sv, uint
                     v->rng ^= v->rng << 5;
                     in = v->k == K_DUST ? ((v->rng & 1023u) < 1u ? (int32_t)(v->rng >> 17) - 16384 : 0)
                                         : (int32_t)(v->rng >> 17) - 16384;
+                    if (v->ca) {                         /* (darker noise in) */
+                        v->c1 += ((in - v->c1) * v->ca) >> 15;
+                        in = v->c1;
+                    }
                     v->lo += (v->f * v->bp) >> 15;
                     hp = in - v->lo - ((v->q * v->bp) >> 15);
                     v->bp += (v->f * hp) >> 15;
@@ -350,7 +363,15 @@ static void haave_spr_mix(int32_t *l, int32_t *r, int32_t *sd, int32_t *sv, uint
                         v->bp = 98304;
                     else if (v->bp < -98304)
                         v->bp = -98304;
-                    x = v->k == K_DUST ? v->bp << 1 : v->bp;
+                    if (v->lo > 98304)
+                        v->lo = 98304;
+                    else if (v->lo < -98304)
+                        v->lo = -98304;
+                    x = v->lpo ? v->lo : v->k == K_DUST ? v->bp << 1 : v->bp;
+                    if (v->cb) {                         /* (softened after) */
+                        v->c2 += ((x - v->c2) * v->cb) >> 15;
+                        x = v->c2;
+                    }
                 }
                 x = (int32_t)(((int64_t)x * v->e) >> 15);
                 x = (int32_t)(((int64_t)x * SPR_GAIN * SPR_KIND_GAIN[v->type]) >> 23);

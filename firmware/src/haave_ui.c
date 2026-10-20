@@ -77,7 +77,7 @@ static const haave_world_t HAAVE_WORLDS[] = {
     {"OCEAN", 2, 0, 54, {{ENGI_NOISE, NZ_WIND, NO_PATCH, 123}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
      {FO_CHOIR, {100, 95, 0, -3, 40, 20, 56, 0}, -12, 86},          /* a low "ooh" under the waves */
      RV_HALL, 80, DT_2, 36, DS_DRIFT, 2},
-    {"RAIN", 4, 1, 62, {{ENGI_NOISE, NZ_RAIN, NO_PATCH, 127}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 118}, SUB},
+    {"RAIN", 4, 1, 62, {{ENGI_NOISE, NZ_RAIN, NO_PATCH, 111}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 118}, SUB},
      {FO_CHOIR, {127, 127, 0, -5, 18, 30, 38, 0}, -12, 93},         /* a hum through the rain */
      RV_ROOM, 82, DT_8D, 40, DS_RIPPLE, 3},
     {"CAVE", 9, 1, 50, {{ENGI_FM6, FM6_PAD, DF_DARK_PAD, 107}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
@@ -140,10 +140,11 @@ static void haave_apply(void)
             amp = PAD_BEH[haave_style % DS_N].amp;
     gl = gl < 0 ? 0 : gl > 127 ? 127 : gl;
     pg = gl + PAD_BEH[haave_style % DS_N].glow;
-    if (pad->eng_req == ENGI_NOISE) {                    /* noise: waves, swelling and falling over two bars */
+    if (pad->eng_req == ENGI_NOISE) {                    /* noise: waves, swelling and falling over two bars (rain:
+                                                          * steadier, gently) */
         sync = 2;
         wave = 0;
-        amp = 110;
+        amp = HAAVE_WORLDS[haave_world % HAAVE_NWORLDS].part[0].preset == NZ_RAIN ? 45 : 110;
     }
     /* (each parameter written once, its value worked out first: the audio, cutting in between two writes, would
      * play a block of the first; the pad's breath at its base depth for 3 ms is a tick) */
@@ -310,12 +311,15 @@ static void haave_load(uint32_t w)
             t->p[P_E0 + 3] = 10;                         /* RES */
             t->p[P_E0 + 6] = 60;                         /* DRFT */
         }
-        if (d->part[0].preset == NZ_RAIN) {             /* soft drops: dark, round and a little sparser (no scratch:
-                                                         * as bright as OCEAN, 15 dB below the preset's) */
+        if (d->part[0].preset == NZ_RAIN) {             /* soft rain: a steady hiss, no drops (each drop's impulse was a
+                                                         * click: a scratch), dark and slowly moving (the drops are a
+                                                         * sprinkle) */
+            t->p[P_E0 + 0] = 0;                          /* MODE: ANLG */
             t->p[P_E0 + 1] = 100;                        /* COLR: towards brown */
-            t->p[P_E0 + 2] = haave_cut[HAAVE_PAD] = 55;  /* FREQ */
-            t->p[P_E0 + 3] = 40;                         /* RES */
-            t->p[P_E0 + 5] = 90;                         /* DENS */
+            t->p[P_E0 + 2] = haave_cut[HAAVE_PAD] = 62;  /* FREQ */
+            t->p[P_E0 + 3] = 10;                         /* RES */
+            t->p[P_E0 + 5] = 0;                          /* DENS: no impulses */
+            t->p[P_E0 + 6] = 45;                         /* DRFT */
         }
     }
     haave_reg = d->reg;

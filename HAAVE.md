@@ -207,7 +207,7 @@ into a part as its own patch; Felucca's factory sounds stay as they are.
 | GARDEN | A major | 64 | FM bloom pad | kalimba | bright, open "ah" | CHIME, FLOAT |
 | FOREST | E minor | 58 | FM air pad (breathy) | soft flute | breathy "hoo", like wind | DRIFT, WANDER |
 | OCEAN | D major | 54 | brown-noise waves (swelling over two bars) | clear glass bell, low | low "ooh" | DRIFT, FLOAT |
-| RAIN | E minor | 62 | soft rain drops (noise) | kalimba | hum | RIPPLE, LONGING |
+| RAIN | E minor | 62 | a soft, steady rain hiss (noise, no drops: their clicks were a scratch) | kalimba | hum | RIPPLE, LONGING |
 | CAVE | A minor | 50 | dark FM pad, the whole world 5 semitones lower | clear glass bell | deep choir, "aah" to "ooh" | SWELL, DRONE |
 | HANDPAN | D minor | 66 | warm drone | handpan | warm "ooh" | PULSE, FLOAT |
 | CRYSTAL | C major | 52 | FM air pad | crystal singing bowl | airy, high "aah" | DRIFT, HOME |
