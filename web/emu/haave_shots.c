@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Dominik Siemon */
 /* HAAVE's screen for the website: the browser build (felucca_web.c) compiled natively, played through short scenes
- * (each world playing, the knobs turning, layers joining, the black keys, the keys held, the worlds changing, the
- * behaviours, TIDE, the punch-ins, WARP, the moments), its 240 x 240 screen taken 10 times a second. Each scene is written as
+ * (each world playing, the knobs turning, layers joining, the chords, the instruments, the worlds changing, the
+ * behaviours, TIDE, the punch-ins, WARP, the sprinkles), its 240 x 240 screen taken 10 times a second. Each scene is written as
  * OUT_DIR/NAME.rgb: its frames one after another, 240 x 240 RGB bytes each (tools/make_haave_shots.py makes them
  * animated WebP).
  *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -o build/haave_shots web/emu/haave_shots.c -lm
@@ -164,8 +164,8 @@ int main(int argc, char **argv)
     haave_tide = DT_STILL;
     open_scene("chords");
     run(600);
-    {
-        static const uint8_t SEQ[6] = {0, 2, 3, 6, 8, 4};
+    {   /* (the third again: coloured) */
+        static const uint8_t SEQ[6] = {0, 2, 2, 3, 1, 4};
         for (i = 0; i < 6u; i++) {
             key(BLACK[SEQ[i]]);
             run(1500);
@@ -173,23 +173,37 @@ int main(int argc, char **argv)
     }
     close_scene();
 
-    reset(0, 1u << DL_PAD | 1u << DL_MELODY);            /* playing along: DRONE held, PLAY keys held, BASS held */
+    reset(0, 1u << DL_PAD | 1u << DL_MELODY);            /* the instruments: SYNTH held notes, BELLS, BASS */
     tap(B_PLAY);
     run(4000);
     open_scene("playkeys");
-    run(500);
-    web_keys(1u << WHITE[7]);
-    run(1500);
-    web_keys(1u << WHITE[7] | 1u << WHITE[9]);
-    run(1300);
-    web_keys(1u << WHITE[7] | 1u << WHITE[11]);
-    run(1300);
-    web_keys(1u << WHITE[7] | 1u << WHITE[11] | 1u << WHITE[13]);
-    run(1500);
-    web_keys(1u << WHITE[8] | 1u << WHITE[12]);
-    run(1800);
+    tap(B_SAVE);
+    run(600);
+    web_keys(1u << WHITE[9]);
+    run(900);
+    web_keys(1u << WHITE[9] | 1u << WHITE[12]);
+    run(1200);
     web_keys(0);
-    run(1500);
+    run(600);
+    tap(B_ARP);
+    run(500);
+    key(WHITE[7]);
+    run(500);
+    for (i = 8; i < 16u; i++) {
+        key(WHITE[i]);
+        run(160);
+    }
+    run(600);
+    tap(B_SEQ);
+    run(500);
+    for (i = 0; i < 4u; i++) {
+        web_keys(1u << WHITE[7u + (i * 3u) % 9u]);
+        run(450);
+        web_keys(0);
+        run(150);
+    }
+    run(800);
+    tap(B_ARP);
     close_scene();
 
     reset(0, L_ALIVE);                                   /* the worlds: PRESETS turning */
@@ -226,43 +240,41 @@ int main(int argc, char **argv)
     }
     close_scene();
 
-    reset(0, L_ALIVE);                                   /* the punch-ins: PUMP held, then SWIRL */
+    reset(0, L_ALIVE);                                   /* the punch-ins: PUMP held, then BREATHE */
     tap(B_PLAY);
     run(4000);
     open_scene("punch");
     run(700);
     web_buttons(1u << B_SCL);
-    run(4200);
+    run(5000);
     web_buttons(0);
-    run(900);
-    web_buttons(1u << B_EDIT);
-    run(3200);
-    web_buttons(0);
-    run(900);
-    close_scene();
-
-    reset(0, 1u << DL_PAD | 1u << DL_ARP | 1u << DL_MELODY);   /* WARP: REC held, the music at half speed */
-    tap(B_PLAY);
-    run(4000);
-    open_scene("warp");
-    run(1500);
-    web_buttons(1u << B_REC);
+    run(1800);
+    web_buttons(1u << B_GLO);
     run(4500);
     web_buttons(0);
     run(2500);
     close_scene();
 
-    reset(0, 1u << DL_PAD | 1u << DL_MELODY);            /* the moments: CASCADE, then SWELL held and let go */
+    reset(0, 1u << DL_PAD | 1u << DL_ARP | 1u << DL_MELODY);   /* WARP: HOME held, the music at half speed */
     tap(B_PLAY);
     run(4000);
-    open_scene("moments");
-    run(500);
-    tap(B_ARP);
-    run(3000);
-    web_buttons(1u << B_SEQ);
-    run(7000);
+    open_scene("warp");
+    run(1500);
+    web_buttons(1u << B_HOME);
+    run(4500);
     web_buttons(0);
-    run(3000);
+    run(2500);
+    close_scene();
+
+    reset(8, 1u << DL_PAD | 1u << DL_MELODY);            /* the sprinkles: FOREST's birds, leaves, owl, crickets */
+    tap(B_PLAY);
+    run(4000);
+    open_scene("sprinkles");
+    run(500);
+    for (i = 0; i < 4u; i++) {
+        key(BLACK[5u + i]);
+        run(2600);
+    }
     close_scene();
 
     printf("shots: %s\n", shot_dir);

@@ -5,13 +5,13 @@
  *   1. every world x behaviour with every layer on: no clipping, no clicks, no DC, never silent, levels in a band
  *   2. every punch-in in every world: no clipping, no click, no level jump
  *   4. TIDE: FLOWING and WANDERING move the optional layers now and then, STILL and CALM never; the pad and bass stay
- *   5. the playing keys and the moments: the PLAY keys and CASCADE in the chord and in order in every world, OCT and
- *      chord; DRONE and BASS sound, BASS follows a chord change and ends when let go; each moment plays out and gives
- *      the layers back; a crowd of notes takes no held note for longer than a sixteenth; nothing held ends by itself
- *   6. WARP halves the speed and comes back, PUMP dips on the beat without a click, the held keys follow a chord and
- *      leave nothing held, SWELL held keeps on and settles back when let go
+ *   5. the instruments and the sprinkles: each instrument's notes in the chord and rising in every world, OCT and
+ *      chord; every instrument sound and every sprinkle heard, below clipping, no click; a chord's key again colours it;
+ *      a crowd of notes takes no held note for longer than a sixteenth; nothing held ends by itself
+ *   6. WARP halves the speed and comes back, PUMP dips on the beat without a click, SYNTH's held keys follow a chord
+ *      and leave nothing held, BREATHE rests the layers but the pad and gives them back
  *   3. half an hour (simulated) of random playing: PLAY, layers, black-key chords (tapped and held), the seven knobs,
- *      OCT, the punch-ins, DRONE BASS and the PLAY keys, the moments (tapped and held), WARP; the output always finite, below clipping, no
+ *      OCT, the punch-ins, the instruments and their keys, the sprinkles, WARP; the output always finite, below clipping, no
  *      clicks; every note in range (the bass from E1, the voice E2..C5, the bells up to C7); never more voices than the
  *      8; while PLAY and the pad are on, never 3 s of silence; 30..40 s after a stop, the output below -60 dBFS (no
  *      stuck note; an FM6 voice is judged by what it sounds: its own envelopes end it, a bowl's tail runs long)
@@ -52,9 +52,12 @@ static void run(double ms)
             for (p = 0; p < NPART; p++)
                 for (v = 0; v < NVOICE; v++)
                     if (trk[p].v[v].active) {
-                        act++;
-                        if (trk[p].v[v].note < (p == HAAVE_BASS ? 28u : p == HAAVE_CHOIR ? 40u : 21u) ||
-                            trk[p].v[v].note > (p == HAAVE_CHOIR ? 76u : p == HAAVE_BELL ? 96u : 108u))
+                        act += trk[p].v[v].stage != 4u;  /* (a voice the budget took fades out over this block: the
+                                                          * one that took it starts beside it, by design) */
+                        if (trk[p].engine != trk[p].eng_req || trk[p].xf_on)
+                            continue;                    /* (a sound changing: the last one's notes fade out) */
+                        if (trk[p].v[v].note < (p == HAAVE_BASS ? 28u : p == HAAVE_CHOIR && haave_p4 == 0u ? 40u : 21u) ||
+                            trk[p].v[v].note > (p == HAAVE_CHOIR && haave_p4 == 0u ? 72u : p == HAAVE_BELL ? 96u : 108u))
                             bad_note++;
                     }
             if (act > NVOICE)
@@ -77,9 +80,12 @@ static void run(double ms)
 static void reset(void) { pk = s2 = s1 = jump = 0; nf = 0; }
 static double db(double x) { return 20.0 * log10(x + 1e-12); }
 static double rms(void) { return nf ? sqrt(s2 / nf) : 0; }
-static const uint8_t WHITE[7] = {0, 2, 4, 6, 7, 9, 11}, BLACK[10] = {1, 3, 5, 8, 10, 13, 15, 17, 20, 22};
-static const uint8_t PLAYK[8] = {12, 16, 18, 19, 21, 23, 24, 26};   /* GONG and the seven PLAY keys (BASS: 14) */
-#define HELD (0x252A52Au | 1u << 14)             /* the keys a press holds: the chords and BASS */
+static const uint8_t WHITE[7] = {0, 2, 4, 6, 7, 9, 11}, BLACK[11] = {1, 3, 5, 8, 10, 13, 15, 17, 20, 22, 25};
+static const uint8_t PLAYK[9] = {12, 14, 16, 18, 19, 21, 23, 24, 26};   /* the instrument's nine (white keys 8..16) */
+#define CHORDK (1u << 1 | 1u << 3 | 1u << 5 | 1u << 8 | 1u << 10)   /* the chords' black keys (the first five) */
+#define INSTK (1u << 12 | 1u << 14 | 1u << 16 | 1u << 18 | 1u << 19 | 1u << 21 | 1u << 23 | 1u << 24 | 1u << 26)
+#define HELD (CHORDK | INSTK)                    /* the keys a press holds: the chords, the instrument's */
+static const uint8_t INST_BTN[3] = {B_SAVE, B_ARP, B_SEQ};   /* SYNTH BELLS BASS */
 static void press(uint32_t mask) { web_keys(mask); run(30); }
 static void button(uint32_t b) { web_buttons(1u << b); run(20); web_buttons(0); run(20); }
 
@@ -118,9 +124,8 @@ static void matrix(void)
 }
 
 /* 3: every punch-in in every world, all layers on: held 4 s, then let go: no clipping, no click, and the level within
- * a few dB of the sound without it (WASH and SHIMMER add, UNDERWATER takes away, none may jump) */
+ * a few dB of the sound without it (each fades in over a beat and out over a beat: none may jump) */
 static const uint8_t PUNCH_BTN[DP_NPUNCH] = {B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO};
-static const uint8_t MOMENT_BTN[DM_N] = {B_SEQ, B_SAVE, B_ARP, B_HOME};
 static void punches(void)
 {
     uint32_t w, k;
@@ -168,14 +173,14 @@ static void restless(uint32_t minutes)
             button(B_PLAY);
         else if (a < 22)
             keys ^= 1u << WHITE[rnd(7)];                 /* a layer: press and let go */
-        else if (a < 28)
-            keys ^= 1u << PLAYK[rnd(8)];                 /* GONG or a note: a tap */
         else if (a < 30)
-            keys ^= 1u << 14;                            /* BASS: held, or let go */
+            keys ^= 1u << PLAYK[rnd(9)];                 /* the instrument: a key held, or let go */
+        else if (a < 42)
+            keys = (keys & ~CHORDK) | 1u << BLACK[rnd(5)];   /* a chord: held for a while (again: coloured) */
         else if (a < 45)
-            keys = (keys & ~0x252A52Au) | 1u << BLACK[rnd(10)];   /* a chord: held for a while */
+            keys |= 1u << BLACK[5u + rnd(6)];            /* a sprinkle: a tap */
         else if (a < 55)
-            keys &= ~0x252A52Au;                         /* .. let go */
+            keys &= ~CHORDK;                             /* .. let go */
         else if (a < 80)
             web_enc(EN_K1 + rnd(4), (int32_t)rnd(21) - 10);
         else if (a < 85)
@@ -186,17 +191,10 @@ static void restless(uint32_t minutes)
             web_enc(EN_SELECT, rnd(2) ? 1 : -1);
         else if (a < 97)
             button(rnd(2) ? B_OCTUP : B_OCTDN);
-        else if (a < 98) {
-            uint32_t mb = MOMENT_BTN[rnd(DM_N)];         /* a moment: tapped, or held a while */
-            if (rnd(2))
-                button(mb);
-            else {
-                web_buttons(1u << mb);
-                run(500.0 + rnd(6000));
-                web_buttons(0);
-            }
-        } else if (a < 99 && rnd(2)) {                   /* WARP: REC held a while */
-            web_buttons(1u << B_REC);
+        else if (a < 98)
+            button(INST_BTN[rnd(3)]);                    /* an instrument (SAVE again: SYNTH's next sound) */
+        else if (a < 99 && rnd(2)) {                     /* WARP: HOME held a while */
+            web_buttons(1u << B_HOME);
             run(500.0 + rnd(5000));
             web_buttons(0);
         }
@@ -206,7 +204,7 @@ static void restless(uint32_t minutes)
             web_buttons(0);
         }
         press(keys);
-        keys &= HELD;                                    /* (the other white keys: a tap) */
+        keys &= HELD;                                    /* (the layers' keys and the sprinkles': a tap) */
         press(keys);
         {
             double before = s2;
@@ -322,88 +320,93 @@ static void fades(void)
     CHECK(r[1] < -60.0, "stop: still %.1f dBFS 30..40 s later", r[1]);
 }
 
-/* 5: the playing keys and the moments, in every world: the PLAY keys' notes rise and fit the chord whatever it is;
- * GONG and BASS sound; each moment starts, plays out and gives the layers back as they were, GLOW back at 0, no clipping */
+/* 5: the instruments and the sprinkles, in every world: each instrument's nine notes fit the chord whatever it is (every
+ * chord, coloured or not, OCT) and rise, in their ranges (SYNTH and BELLS C2..C7, BASS E1..E4); each instrument and
+ * each SYNTH sound plays a run (heard, no clipping, no click); each world's six sprinkles play out (heard, no clipping,
+ * no click, their voices free again); a chord's key pressed again colours it, and again makes it plain; a crowd of
+ * notes takes no held note for long; nothing held ends by itself */
 static void playing(void)
 {
-    uint32_t w, m, i, d, bad = 0, gave = 0;
-    printf("-- the PLAY keys and the moments\n");
-    for (w = 0; w < HAAVE_NWORLDS; w++) {                 /* every world's key and register, OCT, chord, add9 */
+    uint32_t w, m, i, d, in, k, bad = 0, cbad = 0, quiet = 0, loud = 0, spr = 0;
+    printf("-- the instruments and the sprinkles\n");
+    for (w = 0; w < HAAVE_NWORLDS; w++) {
         haave_load(w);
-        for (m = 0; m < 3u; m++)
-            for (d = 0; d < 7u; d++)
-                for (i = 0; i < 2u; i++) {
-                    uint32_t k, last = 0, hi = 999;
-                    haave_oct = (int8_t)((int32_t)m - 1);
-                    haave_cur = (int8_t)d;
-                    haave_bright = (uint8_t)i;
-                    for (k = 0; k < 7u; k++) {
-                        uint32_t n = haave_key_note(k);
-                        bad += !haave_fits((int32_t)n) || n <= last || n > 96u || n < 36u;
-                        last = n;
+        for (in = 0; in < DI_N; in++)
+            for (m = 0; m < 3u; m++)
+                for (d = 0; d < 7u; d++)
+                    for (i = 0; i < 2u; i++) {
+                        uint32_t last = 0;
+                        haave_inst = (uint8_t)in;
+                        haave_oct = (int8_t)((int32_t)m - 1);
+                        haave_cur = (int8_t)d;
+                        haave_bright = (uint8_t)i;
+                        for (k = in == DI_BELLS ? 1u : 0u; k < 9u; k++) {   /* (BELLS' first: the GONG) */
+                            uint32_t n = haave_key_note(k), lo = in == DI_BASS ? 28u : 36u, hi = in == DI_BASS ? 64u : 96u;
+                            bad += !haave_fits((int32_t)n) || n <= last || n < lo || n > hi;
+                            last = n;
+                        }
                     }
-                    for (k = 0; k < 9u; k++) {           /* CASCADE: falling */
-                        uint32_t n = haave_chord_up(8u - k, haave_lo() + 5, 8u, 96);
-                        bad += !haave_fits((int32_t)n) || n >= hi || n > 96u;
-                        hi = n;
-                    }
-                }
     }
     haave_oct = 0;
-    CHECK(!bad, "the PLAY keys and CASCADE: %u notes out of the chord, not in order, or out of range", bad);
-    haave_tide = DT_CALM;                                /* (TIDE's layer changes would muddle the check) */
+    haave_inst = DI_BELLS;
+    CHECK(!bad, "the instruments: %u notes out of the chord, not rising, or out of range", bad);
+    haave_tide = DT_STILL;
     button(B_PLAY);
     for (w = 0; w < HAAVE_NWORLDS; w++) {
-        web_enc(EN_PRESET, 1);
-        run(5000);
-        haave_layers = 1u << DL_PAD | 1u << DL_MELODY;
+        haave_load(w);
+        run(3000);
+        haave_layers = 1u << DL_PAD;
         haave_voice_held();
-        reset();
-        press(1u << 12);                                 /* GONG */
-        press(0);
-        haave_tide = DT_STILL;
-        press(1u << 14);                                 /* BASS, held: it follows a chord change, ends when let go */
-        run(500);
-        {
-            uint32_t n0 = haave_bass.n ? haave_bass.note[0] : 0, n1;
-            press(1u << 14 | 1u << BLACK[3]);
-            press(1u << 14);
-            run(500);
-            n1 = haave_bass.n ? haave_bass.note[0] : 0;
-            CHECK(n0 && n1 && (int32_t)n1 % 12 == ((int32_t)haave_root + haave_step(haave_cur)) % 12,
-                  "%s: the BASS key %u -> %u, the chord's root %d", HAAVE_WORLDS[w].name, n0, n1,
-                  ((int32_t)haave_root + haave_step(haave_cur)) % 12);
-        }
-        press(0);
-        CHECK(haave_bass.n == 0, "%s: the BASS key let go, the bass still holds", HAAVE_WORLDS[w].name);
-        haave_tide = DT_CALM;
-        for (i = 0; i < 7u; i++) {                       /* a run up the PLAY keys */
-            press(1u << PLAYK[1u + i]);
-            press(0);
-            run(150);
-        }
-        run(1500);
-        CHECK(pk < 0.9 && pk > 0.003, "%s: the keys peak at %.3f", HAAVE_WORLDS[w].name, pk);
-        for (m = 0; m < DM_N; m++) {
-            uint8_t before = haave_layers;
-            int seen = 0;
+        for (in = 0; in < 3u + DY_N - 1u; in++) {        /* SYNTH (each of its sounds), BELLS, BASS */
+            button(INST_BTN[in < DY_N ? 0u : in - DY_N + 1u]);
+            run(400);
             reset();
-            button(MOMENT_BTN[m]);
-            for (i = 0; i < 400u && (haave_mom >= 0 || haave_mom_req != 0xFF || !seen); i++) {
-                seen |= haave_mom == (int8_t)m;
-                run(250);
+            for (i = 0; i < 9u; i++) {
+                web_keys(1u << PLAYK[i]);
+                run(260);
+                web_keys(0);
+                run(40);
             }
-            gave += seen && haave_mom < 0 && haave_layers == before && haave_mom_glow == 0;
-            CHECK(seen, "%s: %s never started", HAAVE_WORLDS[w].name, HAAVE_MOMENT[m]);
-            CHECK(haave_mom < 0, "%s: %s never ended", HAAVE_WORLDS[w].name, HAAVE_MOMENT[m]);
-            CHECK(haave_layers == before, "%s: %s left the layers %02x (were %02x)", HAAVE_WORLDS[w].name,
-                  HAAVE_MOMENT[m], haave_layers, before);
-            CHECK(pk < 0.9 && jump < 0.3, "%s: %s peaks %.3f, step %.3f", HAAVE_WORLDS[w].name, HAAVE_MOMENT[m], pk, jump);
+            run(800);
+            quiet += pk < 0.01;
+            loud += pk > 0.9 || jump > 0.3;
+            if (pk < 0.01 || pk > 0.9 || jump > 0.3)
+                printf("  %s, %s: peak %.3f, step %.3f\n", HAAVE_WORLDS[w].name,
+                       in < DY_N ? HAAVE_SYNTH_NAME[haave_synth % DY_N] : in == DY_N ? "BELLS" : "BASS", pk, jump);
+        }
+        for (k = 0; k < 6u; k++) {                       /* the six sprinkles */
+            reset();
+            press(1u << BLACK[5u + k]);
+            press(0);
+            for (i = 0; i < 80u && haave_spr_lit; i++)
+                run(100);
+            spr++;
+            quiet += pk < 0.005;
+            loud += pk > 0.9 || jump > 0.3 || haave_spr_lit;
+            if (pk < 0.005 || pk > 0.9 || jump > 0.3 || haave_spr_lit)
+                printf("  %s, %s: peak %.3f, step %.3f, %s\n", HAAVE_WORLDS[w].name,
+                       HAAVE_SPR_NAME[HAAVE_SPR[w][k]], pk, jump, haave_spr_lit ? "still sounding" : "done");
+        }
+        {   /* a chord's key: there; again: coloured; again: plain */
+            int32_t dg = HAAVE_BLACK[haave_minor & 1u][1];
+            press(1u << BLACK[1]);
+            press(0);
+            cbad += haave_cur != dg || haave_bright;
+            press(1u << BLACK[1]);
+            press(0);
+            cbad += haave_cur != dg || !haave_bright;
+            press(1u << BLACK[1]);
+            press(0);
+            cbad += haave_cur != dg || haave_bright;
         }
     }
-    printf("  %u of %u moments played out and gave the music back\n", gave, (unsigned)(HAAVE_NWORLDS * DM_N));
+    button(INST_BTN[1]);
+    printf("  14 worlds x 6 instrument sounds and %u sprinkles: %u not heard, %u too loud or clicking; colour %s\n", spr,
+           quiet, loud, cbad ? "WRONG" : "right");
+    CHECK(!quiet && !loud, "the instruments and sprinkles: %u not heard, %u too loud or clicking", quiet, loud);
+    CHECK(!cbad, "a chord's key again: not coloured, or not plain again (%u)", cbad);
     for (w = 0; w < HAAVE_NWORLDS; w++) {                 /* a crowd: every layer, the busiest behaviours, the gong and
-                                                          * quick runs up the PLAY keys (the voice budget) */
+                                                          * quick runs up the bells (the voice budget) */
         haave_load(w);
         haave_style = (uint8_t)(w % 2u ? DS_RIPPLE : DS_CHIME);
         haave_apply();
@@ -412,10 +415,8 @@ static void playing(void)
         haave_voice_held();
         run(1000);
         for (m = 0; m < 4u; m++) {
-            press(1u << 12);
-            press(0);
-            for (i = 0; i < 7u; i++) {
-                press(1u << PLAYK[1u + i]);
+            for (i = 0; i < 9u; i++) {
+                press(1u << PLAYK[i]);
                 press(0);
             }
             run(600);
@@ -440,13 +441,13 @@ static void playing(void)
     run(3000);
 }
 
-/* 6: the new hands: WARP (REC held) halves the speed and comes back; PUMP dips on every beat (6 dB or more between the
- * dip and the swell) and leaves no click; the PLAY keys and DRONE hold the pad while held, follow a chord change, and
- * leave nothing held when let go (the pad's counts back to its chord's); SWELL held keeps on, let go it settles back */
+/* 6: WARP (HOME held) halves the speed and comes back; PUMP dips on every beat (6 dB or more between the dip and the
+ * swell) and leaves no click; SYNTH's keys held follow a chord change and leave nothing held when let go; BREATHE rests
+ * the layers but the pad while held and gives them back */
 static void hands(void)
 {
     uint32_t i, k, bad = 0;
-    printf("-- WARP, PUMP, the held keys, SWELL held\n");
+    printf("-- WARP, PUMP, SYNTH held, BREATHE\n");
     haave_load(0);
     haave_tide = DT_STILL;
     haave_layers = 1u << DL_PAD | 1u << DL_MELODY | 1u << DL_ARP;
@@ -456,7 +457,7 @@ static void hands(void)
         uint32_t t0 = haave_tick, t1, t2;
         run(4000);
         t1 = haave_tick - t0;
-        web_buttons(1u << B_REC);
+        web_buttons(1u << B_HOME);
         run(1500);
         t0 = haave_tick;
         run(4000);
@@ -468,10 +469,10 @@ static void hands(void)
         CHECK(t2 * 10u >= t1 * 4u && t2 * 10u <= t1 * 6u, "WARP: %u sixteenths held against %u (not a half)", t2, t1);
         CHECK(haave_warp == 65536, "WARP let go: the speed %d, not back", haave_warp);
     }
-    {   /* PUMP: the level 10 ms at a time over 8 beats, its dips against its swells */
+    {   /* PUMP: the level 10 ms at a time over 8 beats (after its fade in), its dips against its swells */
         double lo = 1e9, hi = 0;
         web_buttons(1u << B_SCL);
-        run(1500);
+        run(4000);
         reset();
         for (k = 0; k < 8u * 4u * 10u; k++) {        /* (a beat at 72, half time: ~1.67 s; 10 ms windows) */
             double before = s2, r;
@@ -484,47 +485,48 @@ static void hands(void)
             }
         }
         web_buttons(0);
-        run(1000);
+        run(4000);
         printf("  PUMP: %.1f dB between its dips and its swells, largest step %.3f\n", 10 * log10(hi / lo), jump);
         CHECK(10 * log10(hi / lo) > 6.0, "PUMP: only %.1f dB of dip", 10 * log10(hi / lo));
         CHECK(jump < 0.3, "PUMP: a step of %.3f (a click)", jump);
     }
-    {   /* the keys: DRONE and three PLAY keys held across a chord change, then let go */
-        uint32_t held = 1u << PLAYK[0] | 1u << PLAYK[2] | 1u << PLAYK[4] | 1u << PLAYK[6], n0;
+    {   /* SYNTH: three keys held across a chord change, then let go */
+        uint32_t held = 1u << PLAYK[0] | 1u << PLAYK[3] | 1u << PLAYK[6], n0;
+        button(B_SAVE);
+        run(500);
         press(held);
         run(800);
         n0 = haave_kpad.n;
         for (i = 0; i < haave_kpad.n; i++)
-            bad += !haave_gated(HAAVE_PAD, haave_kpad.note[i]) || !haave_fits(haave_kpad.note[i]);
+            bad += !haave_gated(HAAVE_CHOIR, haave_kpad.note[i]) || !haave_fits(haave_kpad.note[i]);
         press(held | 1u << BLACK[3]);
         press(held);
         run(800);
         for (i = 0; i < haave_kpad.n; i++)
-            bad += !haave_gated(HAAVE_PAD, haave_kpad.note[i]) || !haave_fits(haave_kpad.note[i]);
+            bad += !haave_gated(HAAVE_CHOIR, haave_kpad.note[i]) || !haave_fits(haave_kpad.note[i]);
         press(0);
         run(300);
-        for (k = 0; k < 128u; k++) {                 /* the pad's counts: its chord's notes, once each, nothing else */
-            uint32_t want = 0;
-            for (i = 0; i < haave_pad.n; i++)
-                want += haave_pad.note[i] == k;
-            bad += haave_nref[HAAVE_PAD][k] != want;
-        }
-        printf("  the keys: %u notes held (DRONE and three pressed), %u wrong\n", n0, bad);
-        CHECK(n0 >= 3u, "the keys: %u notes held, not 3 or 4 (DRONE and as many as the pad's six voices allow)", n0);
-        CHECK(haave_kpad.n == 0u && !bad, "the keys: %u left held, %u wrong", haave_kpad.n, bad);
+        for (k = 0; k < 128u; k++)                       /* (the voice's part: nothing held, its layer resting) */
+            bad += haave_nref[HAAVE_CHOIR][k] != 0;
+        printf("  SYNTH: %u notes held of three pressed, %u wrong\n", n0, bad);
+        CHECK(n0 == 3u, "SYNTH: %u notes held, not 3", n0);
+        CHECK(haave_kpad.n == 0u && !bad, "SYNTH: %u left held, %u wrong", haave_kpad.n, bad);
+        button(B_ARP);
+        run(500);
     }
-    {   /* SWELL held for 4 bars: still on; let go: back as it was */
-        uint8_t before = haave_layers;
-        web_buttons(1u << B_SEQ);
-        run(4 * 4 * 1667);
-        k = haave_mom == DM_SWELL;
+    {   /* BREATHE held 3 bars: the layers but the pad rest; let go: back */
+        uint32_t resting, back;
+        haave_layers = 1u << DL_PAD | 1u << DL_BASS | 1u << DL_CHOIR;
+        haave_voice_held();
+        run(1000);
+        web_buttons(1u << B_GLO);
+        run(3 * 4 * 1667);
+        resting = haave_breathe && haave_pad.n && !haave_bass.n && !haave_choir.n;
         web_buttons(0);
-        for (i = 0; i < 200u && haave_mom >= 0; i++)
-            run(250);
-        printf("  SWELL held 4 bars: %s; let go, %s\n", k ? "still on" : "ended", haave_mom < 0 && haave_layers == before ?
-               "back as it was" : "NOT back");
-        CHECK(k, "SWELL held: it ended by itself");
-        CHECK(haave_mom < 0 && haave_layers == before, "SWELL let go: layers %02x (were %02x)", haave_layers, before);
+        run(4000);
+        back = !haave_breathe && haave_pad.n && haave_bass.n && haave_choir.n;
+        printf("  BREATHE: %s, let go %s\n", resting ? "the pad alone" : "NOT resting", back ? "all back" : "NOT back");
+        CHECK(resting && back, "BREATHE: resting %u, back %u", resting, back);
     }
     button(B_PLAY);
     run(3000);

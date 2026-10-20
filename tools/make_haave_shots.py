@@ -54,6 +54,8 @@ def main(out):
     out.mkdir(parents=True, exist_ok=True)
     raw = ROOT / "build" / "shots"
     raw.mkdir(parents=True, exist_ok=True)
+    for old in raw.glob("*.rgb"):                       # (a scene gone stays gone)
+        old.unlink()
     exe = ROOT / "build" / "haave_shots"
     subprocess.run(["cc", "-O2", "-ffp-contract=off", "-w", "-Ibuild/gen", "-Ifirmware/src", "-o", str(exe),
                     "web/emu/haave_shots.c", "-lm"], cwd=ROOT, check=True)

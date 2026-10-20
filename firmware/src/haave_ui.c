@@ -22,7 +22,8 @@
 #define ENGI_WHEEL 7u
 #define ENGI_NOISE 11u
 enum { FM6_TINE = 0, FM6_BELL = 1, FM6_PAD = 4, FM6_MARIMBA = 5 };   /* eng_fm6.c FM6_PRESETS */
-enum { AN_SOFT_PAD = 1, AN_SQR_BASS = 2, AN_PWM_STR = 3, AN_SUB_BASS = 7, AN_STRINGS = 11 };   /* eng_analog.c's */
+enum { AN_SAW_LEAD = 0, AN_SOFT_PAD = 1, AN_SQR_BASS = 2, AN_PWM_STR = 3, AN_SINE_KEY = 5, AN_SUB_BASS = 7,
+       AN_STRINGS = 11 };                                                    /* eng_analog.c's */
 enum { FO_CHOIR = 0, FO_LEAD = 1, FO_WHISPER = 3 };                                        /* eng_formant.c's */
 enum { WH_SOFT_FLUTE = 3 };                                                   /* eng_wheel.c's */
 enum { NZ_WIND = 0, NZ_RAIN = 1 };                                            /* eng_noise.c's */
@@ -132,9 +133,9 @@ static const struct { uint8_t sync, wave, amp, atk; int8_t glow; } PAD_BEH[DS_N]
 /* the knobs and the behaviour -> the parts and the effect buses */
 static void haave_apply(void)
 {
-    track_t *pad = &trk[HAAVE_PAD], *bell = &trk[HAAVE_BELL], *bass = &trk[HAAVE_BASS], *choir = &trk[HAAVE_CHOIR];
+    track_t *pad = &trk[HAAVE_PAD], *bell = &trk[HAAVE_BELL], *choir = &trk[HAAVE_CHOIR];
     int32_t sp = haave_knob[DK_SPACE], ec = haave_knob[DK_ECHO], mo = haave_knob[DK_MOTION];
-    int32_t gl = haave_knob[DK_GLOW] + haave_mom_glow;   /* (a moment's GLOW on top) */
+    int32_t gl = haave_knob[DK_GLOW] + haave_fx_glow;    /* (BREATHE's GLOW on top) */
     int32_t pg, sync = PAD_BEH[haave_style % DS_N].sync, wave = PAD_BEH[haave_style % DS_N].wave,
             amp = PAD_BEH[haave_style % DS_N].amp;
     gl = gl < 0 ? 0 : gl > 127 ? 127 : gl;
@@ -150,13 +151,14 @@ static void haave_apply(void)
     pad->p[P_LWAVE] = (int16_t)wave;
     pad->p[P_LTRIG] = 0;
     pad->p[P_ATK] = PAD_BEH[haave_style % DS_N].atk;
-    pad->p[P_REV] = (int16_t)sp;                         /* SPACE: dry and close .. a vast hall, the sound itself
-                                                          * falling back above the middle (fx.c fx_dry: -10 dB) */
-    bell->p[P_REV] = (int16_t)sp;
-    choir->p[P_REV] = (int16_t)sp;
-    bass->p[P_REV] = (int16_t)(sp / 4);
+    /* SPACE: dry and close .. a vast hall, the sound itself falling back above the middle (fx.c fx_dry: -10 dB); the
+     * sends and the dry level are written by the audio (haave_play.c haave_punch_block: WASH lifts them) */
+    haave_rev_base[HAAVE_PAD] = (int16_t)sp;
+    haave_rev_base[HAAVE_BELL] = (int16_t)sp;
+    haave_rev_base[HAAVE_CHOIR] = (int16_t)sp;
+    haave_rev_base[HAAVE_BASS] = (int16_t)(sp / 4);
     song.g[G_RSIZE] = (int16_t)(16 + sp * 111 / 127);
-    fx_dry_to = sp <= 64 ? 32768 : 32768 - (sp - 64) * (sp - 64) * 5645 / 1000;
+    haave_dry_space = sp <= 64 ? 32768 : 32768 - (sp - 64) * (sp - 64) * 5645 / 1000;
     pad->p[P_DLY] = (int16_t)(ec * 3 / 4);               /* ECHO: none .. long trails; above the middle they circle on
                                                           * (feedback to 0.8) and darken each time */
     bell->p[P_DLY] = (int16_t)ec;
@@ -169,8 +171,9 @@ static void haave_apply(void)
     /* GLOW below 48: the whole sound through a low-pass closing, muffled at the bottom (perform.c's FILTER macro, the
      * same filter as its LPF; it glides ~45 ms); above, the sounds' own brightness as before */
     perf_k[0] = (int8_t)(gl < 48 ? -(48 - gl) * 72 / 48 : 0);
-    /* MOTION above 56: the PHASER swirling (its depth: haave_input) and the sound drifting left and right */
-    haave_motion_phs = (uint8_t)(mo > 56);
+    /* MOTION above 56: the PHASER swirling (up to 80 % of its depth: haave_play.c haave_punch_block) and the sound
+     * drifting left and right */
+    haave_motion_depth = mo > 56 ? (mo - 56) * 26214 / 71 : 0;
     haave_pan_to = mo > 56 ? (mo - 56) * 16384 / 71 : 0;
     {   /* MOTION: the pad's tone sways with its breath (CHIME: slowly by itself, ~0.13 Hz) and it breathes deeper */
         int32_t lf = mo / (pad->eng_req == ENGI_FM6 ? 2 : pad->eng_req == ENGI_NOISE ? 8 : 6);
@@ -226,6 +229,70 @@ static void haave_part(track_t *t, const haave_sound_t *d, int16_t atk, int16_t 
     t->p[P_REL] = rel;
 }
 
+/* SYNTH's sounds (SAVE again: the next), on the voice's part while SYNTH is chosen; each world starts on its own */
+enum { DY_WARM, DY_KEYS, DY_GLASS, DY_AIR, DY_N };
+static const char *const HAAVE_SYNTH_NAME[DY_N] = {"SYNTH WARM", "SYNTH KEYS", "SYNTH GLASS", "SYNTH AIR"};
+static const haave_sound_t HAAVE_SYNTH[DY_N] = {
+    {ENGI_ANALOG, AN_SAW_LEAD, NO_PATCH, 96},            /* a soft saw lead (its filter down: haave_inst_load) */
+    {ENGI_FM6, FM6_TINE, DF_SOFT_KEYS, 105},             /* soft electric keys */
+    {ENGI_ANALOG, AN_SINE_KEY, NO_PATCH, 91},            /* a glassy sine */
+    {ENGI_WHEEL, WH_SOFT_FLUTE, NO_PATCH, 106},          /* a breathy flute */
+};
+static const uint8_t HAAVE_SYNTH0[14] = {DY_KEYS, DY_WARM, DY_KEYS, DY_WARM, DY_WARM, DY_WARM, DY_GLASS, DY_AIR,
+                                         DY_GLASS, DY_GLASS, DY_KEYS, DY_WARM, DY_GLASS, DY_KEYS};
+static const haave_sound_t HAAVE_BASS_PUNCH = {ENGI_ANALOG, AN_SQR_BASS, NO_PATCH, 100};   /* BASS's: plucked */
+static volatile uint8_t haave_synth;     /* SYNTH's sound now (DY_*) */
+static uint8_t haave_p4 = 0xFF, haave_p3 = 0xFF;   /* what parts 4 and 3 hold: 0 the world's, else SYNTH's 1 + DY_* /
+                                                    * BASS's 1 */
+static uint32_t haave_pill_ms;           /* a name in the middle of the screen (a sprinkle, an instrument) since */
+static const char *haave_pill;
+
+/* the world's voice on part 4 */
+static void haave_vox_load(const haave_world_t *d)
+{
+    const haave_sound_t v = {ENGI_FORMANT, d->vox.preset, NO_PATCH, d->vox.level};
+    uint32_t i;
+    haave_part(&trk[HAAVE_CHOIR], &v, 84, 120, 100);
+    for (i = 0; i < 8u; i++)
+        trk[HAAVE_CHOIR].p[P_E0 + i] = d->vox.e[i];
+    haave_vox_reg = d->vox.reg;
+    trk[HAAVE_CHOIR].p[P_GLIDE] = 40;
+    trk[HAAVE_CHOIR].p[P_PAN] = -18;
+}
+
+/* the sounds the instrument borrows: part 4 SYNTH's (else the world's voice), part 3 BASS's punchy one (else the
+ * world's bass); force: both (a world loading), else what changed, its held notes started again (haave_resync_part) */
+static void haave_inst_load(int force)
+{
+    const haave_world_t *d = &HAAVE_WORLDS[haave_world % HAAVE_NWORLDS];
+    uint8_t p4 = haave_inst == DI_SYNTH ? (uint8_t)(1u + haave_synth % DY_N) : 0u, p3 = haave_inst == DI_BASS, m = 0;
+    if (force || p4 != haave_p4) {
+        if (p4) {
+            track_t *t = &trk[HAAVE_CHOIR];
+            haave_part(t, &HAAVE_SYNTH[p4 - 1u], 24, 112, 84);   /* (a soft start, a long tail) */
+            t->p[P_GLIDE] = 0;
+            t->p[P_PAN] = -12;
+            if (p4 - 1u == DY_WARM)
+                t->p[P_E0 + 4] = 58;                     /* (the saw's filter down: warm, not buzzy) */
+        } else
+            haave_vox_load(d);
+        haave_p4 = p4;
+        m |= 1u << HAAVE_CHOIR;
+    }
+    if (force || p3 != haave_p3) {
+        if (p3)
+            haave_part(&trk[HAAVE_BASS], &HAAVE_BASS_PUNCH, 0, 70, 40);   /* (a pluck: at once, falling, short) */
+        else
+            haave_part(&trk[HAAVE_BASS], &d->part[2], 40, 120, 90);
+        haave_p3 = p3;
+        m |= 1u << HAAVE_BASS;
+    }
+    if (m && !force) {
+        haave_apply();
+        haave_resync_part |= m;
+    }
+}
+
 static void haave_load(uint32_t w)
 {
     const haave_world_t *d = &HAAVE_WORLDS[w % HAAVE_NWORLDS];
@@ -255,17 +322,9 @@ static void haave_load(uint32_t w)
     trk[HAAVE_PAD].p[P_DEC] = 90;
     haave_part(&trk[HAAVE_BELL], &d->part[1], 0, 127, 100);     /* struck: its own decay, a long release */
     trk[HAAVE_BELL].p[P_PAN] = 20;
-    haave_part(&trk[HAAVE_BASS], &d->part[2], 40, 120, 90);
-    {   /* the voice: its preset, then the world's own vowel, register and level */
-        const haave_sound_t v = {ENGI_FORMANT, d->vox.preset, NO_PATCH, d->vox.level};
-        uint32_t i;
-        haave_part(&trk[HAAVE_CHOIR], &v, 84, 120, 100);
-        for (i = 0; i < 8u; i++)
-            trk[HAAVE_CHOIR].p[P_E0 + i] = d->vox.e[i];
-        haave_vox_reg = d->vox.reg;
-    }
-    trk[HAAVE_CHOIR].p[P_GLIDE] = 40;
-    trk[HAAVE_CHOIR].p[P_PAN] = -18;
+    haave_synth = HAAVE_SYNTH0[haave_world % 14u];       /* (each world's own SYNTH to start with) */
+    haave_inst_load(1);                                  /* (the bass and the voice, or the instrument's) */
+    haave_spr_world = haave_world;
     haave_root = d->root;
     haave_minor = d->minor;
     haave_bpm = d->bpm;
@@ -284,7 +343,6 @@ static void haave_load(uint32_t w)
 
 /* ------------------------------------------------------------- input --- */
 static const uint8_t HAAVE_PUNCH_BTN[DP_NPUNCH] = {B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO};   /* (haave_play.c) */
-static const uint8_t HAAVE_MOMENT_BTN[DM_N] = {B_SEQ, B_SAVE, B_ARP, B_HOME};   /* SWELL BREATHE CASCADE HOME */
 static int32_t haave_turn(uint32_t role)                 /* a list knob: one step per turn, whatever its speed */
 {
     int32_t s = panel_enc(role);
@@ -302,9 +360,7 @@ static void haave_input(void)
         perf_mask = 0;
         for (i = 0; i < DP_NPUNCH; i++)
             haave_punch_bit[i] = 1u << panel.btn[HAAVE_PUNCH_BTN[i]];
-        for (i = 0; i < DM_N; i++)
-            haave_mom_bit[i] = 1u << panel.btn[HAAVE_MOMENT_BTN[i]];
-        haave_warp_bit = 1u << panel.btn[B_REC];
+        haave_warp_bit = 1u << panel.btn[B_HOME];
         haave_load(0);
     }
     for (i = 0; i < DK_N; i++)
@@ -314,18 +370,44 @@ static void haave_input(void)
             haave_apply();
             haave_bars |= (uint8_t)(1u << i);
         }
-    {   /* the PHASER's depth (perform.c perf_k[3], a cut 0..100): SWIRL full, MOTION's soft, FREEZE and SHIMMER their own
-         * (it is their level and shimmer too) */
-        int32_t mo = haave_knob[DK_MOTION], p = haave_punch, k3 = 0;
-        if (mo > 56 && !((p >> DP_SWIRL) & 1) && !((p >> DP_FREEZE) & 1) && !((p >> DP_SHIMMER) & 1))
-            k3 = 100 - (mo - 56) * 80 / 71;
-        perf_k[3] = (int8_t)k3;
-    }
-    {   /* a moment's GLOW moved */
+    {   /* BREATHE's GLOW moved */
         static int8_t g;
-        if (g != haave_mom_glow) {
-            g = haave_mom_glow;
+        if (g != haave_fx_glow) {
+            g = haave_fx_glow;
             haave_apply();
+        }
+    }
+    {   /* the instrument: SAVE SYNTH (again: its next sound), ARP BELLS, SEQ BASS; its name a moment */
+        const char *nm = 0;
+        uint32_t b = (pressed >> panel.btn[B_SAVE]) & 1u ? 1u : (pressed >> panel.btn[B_ARP]) & 1u ? 2u :
+                     (pressed >> panel.btn[B_SEQ]) & 1u ? 3u : 0u;
+        if (b == 1u) {
+            if (haave_inst == DI_SYNTH)
+                haave_synth = (uint8_t)((haave_synth + 1u) % DY_N);
+            haave_inst = DI_SYNTH;
+            nm = HAAVE_SYNTH_NAME[haave_synth % DY_N];
+        } else if (b == 2u) {
+            haave_inst = DI_BELLS;
+            nm = "BELLS";
+        } else if (b == 3u) {
+            haave_inst = DI_BASS;
+            nm = "BASS";
+        }
+        if (b) {
+            haave_inst_load(0);
+            haave_pill = nm;
+            haave_pill_ms = fm1_ms;
+            haave_head = 1;
+        }
+    }
+    {   /* a sprinkle started: its name a moment */
+        static uint8_t seen;
+        if (seen != haave_spr_seen) {
+            seen = haave_spr_seen;
+            if (haave_spr_last < HS_N) {
+                haave_pill = HAAVE_SPR_NAME[haave_spr_last];
+                haave_pill_ms = fm1_ms;
+            }
         }
     }
     if ((s = haave_turn(EN_PRESET)) != 0) {              /* playing: fade out, load at silence, fade in (haave_play.c) */
@@ -392,16 +474,17 @@ static void haave_leds(void)
         ready = 1;
     }
     for (k = 0; k < 27u; k++) {
-        uint32_t p = key_place(k), on;
-        if (!key_black(k))                               /* a layer: lit while on; GONG BASS and the PLAY keys: as held */
+        uint32_t p = key_place(k), on, rest = 0;
+        if (!key_black(k)) {                             /* a layer: lit while on (breathing while its part plays the
+                                                          * instrument); the instrument's keys: as held */
             on = p < DL_N ? (haave_layers >> p) & 1u : (fm1_in.notes >> k) & 1u;
-        else
-            on = ((fm1_in.notes >> k) & 1u) ||
-                 (haave_run && haave_deg == HAAVE_BLACK[haave_minor & 1u][p % 5u] && haave_bright == (p >= 5u));
-        led_put(nl, 14u + k, (int)on);
-        led_put(nd, 14u + k, 1);
-        led_put(nm, 14u + k, p >= DW_DRONE && p < DW_PLAY && !key_black(k));   /* (DRONE, BASS: brighter; mid over
-                                                                                * the glow, fm1_input.h) */
+            rest = p < DL_N && on && ((p == DL_CHOIR && haave_inst == DI_SYNTH) || (p == DL_BASS && haave_inst == DI_BASS));
+        } else if (p < 5u)                               /* a chord: the one sounding lit */
+            on = ((fm1_in.notes >> k) & 1u) || (haave_run && haave_deg == HAAVE_BLACK[haave_minor & 1u][p]);
+        else                                             /* a sprinkle: lit while it sounds */
+            on = ((fm1_in.notes >> k) & 1u) || ((haave_spr_lit >> (p - 5u)) & 1u);
+        led_put(rest ? nb : nl, 14u + k, (int)on);
+        led_put(nd, 14u + k, !rest);
     }
     led_put(nl, panel.btn[B_OCTDN], haave_oct < 0);
     led_put(nl, panel.btn[B_OCTUP], haave_oct > 0);
@@ -409,14 +492,17 @@ static void haave_leds(void)
         nl[LED_PLAY_GREEN >> 3] |= (uint8_t)(1u << (LED_PLAY_GREEN & 7u));
     else
         led_put(nb, panel.btn[B_PLAY], 1);               /* stopped: PLAY breathes, press me */
-    led_put(nl, panel.btn[B_REC], haave_warp < 65000 || (fm1_in.buttons & haave_warp_bit));   /* REC: WARP */
-    led_put(nd, panel.btn[B_REC], 1);
-    for (k = 0; k < DM_N; k++) {                         /* the moment buttons: lit from the press to the end of theirs */
-        led_put(nl, panel.btn[HAAVE_MOMENT_BTN[k]], haave_mom == (int8_t)k || haave_mom_req == k);
-        led_put(nd, panel.btn[HAAVE_MOMENT_BTN[k]], 1);
-    }
-    for (k = 0; k < DP_NPUNCH; k++) {                    /* the punch-in buttons: lit while held, dim otherwise */
-        led_put(nl, panel.btn[HAAVE_PUNCH_BTN[k]], (haave_punch >> k) & 1u);
+    led_put(nl, panel.btn[B_HOME], haave_warp < 65000 || (fm1_in.buttons & haave_warp_bit));   /* HOME: WARP */
+    led_put(nd, panel.btn[B_HOME], 1);
+    led_put(nd, panel.btn[B_REC], 1);                    /* (REC: nothing yet) */
+    led_put(nl, panel.btn[B_SAVE], haave_inst == DI_SYNTH);   /* the instrument chosen */
+    led_put(nl, panel.btn[B_ARP], haave_inst == DI_BELLS);
+    led_put(nl, panel.btn[B_SEQ], haave_inst == DI_BASS);
+    led_put(nd, panel.btn[B_SAVE], 1);
+    led_put(nd, panel.btn[B_ARP], 1);
+    led_put(nd, panel.btn[B_SEQ], 1);
+    for (k = 0; k < DP_NPUNCH; k++) {                    /* the punch-in buttons: lit while they play, dim otherwise */
+        led_put(nl, panel.btn[HAAVE_PUNCH_BTN[k]], ((haave_punch >> k) & 1u) || haave_plvl[k] > 0);
         led_put(nd, panel.btn[HAAVE_PUNCH_BTN[k]], 1);
     }
     fm1_led_dim_level(1);
@@ -822,9 +908,8 @@ static void haave_viz(void)
             if (viz_place(p, i, v->note, lvl, &x, &y, &rad))
                 d_disc(x, y, 2 + rad / 2, HAAVE_PCOL[p], (uint32_t)(4 + lvl / 4));   /* (dimmer as it fades) */
         }
-    {   /* a punch-in playing, else WARP, else a moment: its name in the middle */
-        int32_t mom = haave_mom;                         /* (once: the audio may end it meanwhile) */
-        const char *nm = haave_warp < 65000 ? "WARP" : mom >= 0 ? HAAVE_MOMENT[mom % DM_N] : 0;
+    {   /* a punch-in playing, else WARP, else a sprinkle or an instrument just chosen: its name in the middle */
+        const char *nm = haave_warp < 65000 ? "WARP" : haave_pill && fm1_ms - haave_pill_ms < 1600u ? haave_pill : 0;
         for (p = 0; p < DP_NPUNCH; p++)
             if ((haave_punch >> p) & 1u) {
                 nm = HAAVE_PUNCH_NAME[p];

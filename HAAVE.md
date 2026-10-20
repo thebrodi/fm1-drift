@@ -37,16 +37,17 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 | **KNOB 3 — Glow** | Below 48: the whole sound through a low-pass closing to ~440 Hz at 0, muffled as if under water (`perform.c`'s FILTER macro, gliding ~45 ms); above: the sounds' own brightness (FM brightness, the analog pads' filter; the bells half as much; the reverb's damping and the echo's colour around the world's own). About 20 dB less above 1.5 kHz at 0 than at 127, the level the same |
 | **KNOB 4 — Motion** | Still and sparse → busy and moving (how often the layers play: ×0.2 … ×2.2; chorus and drift; the pad's tone sways with its breath, and it breathes deeper); above 56 the PHASER swirls in (up to 80 % of its depth) and the sound drifts left and right (a cycle every two bars, the far side to −6 dB), +2.5 dB at the top to stay as loud |
 | **White keys 1–7** | Toggle the 7 layers, lit while on |
-| **White keys 8–9** | DRONE and BASS (below), a little brighter than the rest |
-| **White keys 10–16** | PLAY keys: the chord's tones going up, held (below) |
-| **Black keys** | Chords to move to: press = go there; the chord lasts as long as TIDE's chords do (STILL: until the next press) |
+| **White keys 8–16** | The instrument (below): lit while held |
+| **SAVE / ARP / SEQ** | The instrument for those keys: SYNTH (SAVE again: its next sound), BELLS, BASS; the chosen one lit |
+| **Black keys 1–5** | Chords to move to: press = go there, again = the same chord coloured (and again: plain); it lasts as long as TIDE's chords do (STILL: until the next press) |
+| **Black keys 6–11** | Sprinkles: the world's six little sounds (below), lit while they sound |
 | **PRESETS** knob | The world: the sounds, the key and the tempo. Playing, a change dips out (1.5 s) and back in (2.5 s): no cut |
 | **ALGORITHM** knob | The behaviour: how every layer plays (DRIFT, RIPPLE, SWELL, CHIME, PULSE); its rhythm shown a moment |
 | **SELECT** knob | TIDE: how much the music moves by itself (STILL, CALM, FLOWING, WANDERING); shown a moment |
 | **OCT− / OCT+** | Everything an octave down / up |
-| **FX SCL ENV LFO EDIT GLO** | Punch-in effects on the whole sound while held (below) |
-| **HOME SAVE ARP SEQ** | Moments: SWELL and BREATHE held, CASCADE and HOME a tap (below) |
-| **REC** | WARP while held (below) |
+| **FX SCL ENV LFO EDIT GLO** | Punch-in effects on the whole sound while held, fading in and out (below) |
+| **HOME** | WARP while held (below) |
+| **REC** | Nothing yet |
 
 ### Layers (white keys, from the left)
 
@@ -61,85 +62,96 @@ The FM-1 has 7 encoders (knobs), 14 buttons and 27 keys (see `firmware/src/panel
 | 7 | SHIMMER | A high note above the pad, an octave up |
 
 PAD and MELODY are on at power-on. The FM-1 sounds 8 voices at once across 4 parts, so the layers
-share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), VOX (part 4). DRONE and
-the PLAY keys hold notes in part 1 (the pad's sound), or part 4 (the voice) in OCEAN and RAIN, whose pad is noise; a
-note two of them hold (the pad's chord, a key) sounds once and ends with its last holder (`haave_nref`). When all 8
-are held, the oldest bell lets go first (it rings out on its release) rather than a held pad, bass, voice or key note
+share them: PAD and SHIMMER (part 1), ARP, SPARKLE and MELODY (part 2), BASS (part 3), VOX (part 4). The instrument
+borrows a part: SYNTH part 4 (the VOX layer rests meanwhile), BELLS part 2, BASS part 3 (the BASS layer rests); a note
+two holders hold sounds once and ends with its last (`haave_nref`). The sprinkles have four voices of their own
+(`haave_spr.c`), beside the 8. When all 8 are held, the oldest bell lets go first (it rings out on its release) rather than a held pad, bass, voice or key note
 being taken; and a held note the budget takes anyway (a crowd of strikes in one block, or the CPU's shedding on the
 device) is played again within a sixteenth.
 
-### Playing along (white keys 8–16)
+### Playing along (white keys 8–16, SAVE ARP SEQ)
 
-The right part of the keyboard plays over the music, with the world's own sounds, held while the key is (they swell
-in and fade out on the sound's own envelope), and every note fits:
+The nine keys on the right play one instrument over the music, chosen with SAVE, ARP or SEQ (the chosen one lit, its
+name a moment on the screen), and every note fits:
 
-| Key | Plays |
+| Button | Instrument | The nine keys |
+|---|---|---|
+| SAVE | SYNTH: its own sound on part 4, each world starting on its own; SAVE again: the next (WARM a soft saw lead, KEYS soft electric keys, GLASS a glassy sine, AIR a breathy flute). The VOX layer rests meanwhile | The chord's scale from about C4 up: the key's notes that fit the chord now (a whole tone at least from each of its tones), about five an octave, so nine keys are about two octaves. Held while the key is, as many as the voices allow (the latest pressed first) |
+| ARP | BELLS: the world's bells (part 2), struck and ringing out | The first: the GONG (the chord's root low, its octave softly above); then the chord's tones from about C4 up, eight of them |
+| SEQ | BASS: a plucked square bass on part 3; the BASS layer rests meanwhile | The chord's scale from E1 .. E2 up (whatever OCT), one note at a time, the latest held |
+
+Held notes follow the chord: a chord change moves them to the new one's. The keys light while held, and play when the
+music is stopped too. Changing the instrument changes the borrowed part's sound (Felucca's own gentle release, then
+the new sound), and the layer that rested comes back.
+
+### Sprinkles (black keys 6–11)
+
+Each world has six little sounds of its own on the six black keys on the right, a press each (stopped too): its name a
+moment on the screen, the key lit while it sounds. Most are made by `haave_spr.c`'s four voices: a sine with a
+glide, or noise through a band-pass, in short events with an attack and a fall, the pitched ones on the chord's tones;
+CHIMES, CASCADE and GONG strike the world's bells. They go into the dry sound and the echo's and reverb's sends
+(before SPACE's dry level), so they sit in the world's room, about 5–14 dB below the pad (the bells' ones at its level).
+
+| World | Sprinkles, left to right |
 |---|---|
-| 8 | DRONE: the chord's root on the pad's sound, below its chord |
-| 9 | BASS: the chord's root on the bass, following the chords like the BASS layer (whose note, if it plays, is struck again) |
-| 10–16 | The chord's three tones from about C4 up, then again an octave higher, and the lowest once more two octaves up (E6 at most): seven notes going up, on the pad's sound. In OCEAN and RAIN (a noise pad) they sing on the world's voice instead, E2 to E5 |
+| GLASS | chimes, cascade, drops, bird, wind, gong |
+| EMBER | crackle (a fire), bird, chimes, wind, cascade, gong |
+| DUSK | bird, crickets, wind, chimes, cascade, gong |
+| NIGHT | owl, crickets, wind, drops, chimes, gong |
+| NEON | laser, bubbles, crackle, cascade, chimes, gong |
+| LOFI | crackle (vinyl), laser, drops, songbird, cascade, gong |
+| BOWLS | gong, chimes, cascade, drops, wind, bird |
+| GARDEN | bird, songbird, leaves, chimes, drops, cascade |
+| FOREST | bird, leaves, owl, crickets, drops, wind |
+| OCEAN | gull, wave, bubbles, wind, chimes, gong |
+| RAIN | thunder, drops, bubbles, wind, chimes, songbird |
+| CAVE | drops, bubbles, wind, thunder, chimes, gong |
+| HANDPAN | chimes, drops, bird, wind, cascade, gong |
+| CRYSTAL | chimes, cascade, drops, bubbles, wind, gong |
 
-They follow the chord: a chord change moves the held notes to the new one. They light while held, and they play when
-the music is stopped too. They take only the voices left: the pad's sound has 6 of its own (an FM pad; the voice 4),
-its chord three of them, so with DRONE held two or three PLAY keys sound at once, the latest pressed; SHIMMER steps
-aside while keys are held.
-
-### Moments (HOME SAVE ARP SEQ)
-
-A moment starts on the next beat. SWELL and BREATHE go on while their button is held (a tap: a bar) and settle back
-when it is let go; CASCADE and HOME are a tap. Each gives the music back as it was (a layer toggled meanwhile is
-kept). The button lights from the press until the moment has settled, and its name shows on the screen; a press
-during another moment ends that one. TIDE leaves the layers alone meanwhile. Stopped, they do nothing.
-
-| Button | Moment |
-|---|---|
-| HOME | HOME (a tap): back to the path's first chord, the bass struck |
-| SAVE | BREATHE (held): only the pad, a little darker (GLOW −24 over half a bar); let go, everything back on the beat |
-| ARP | CASCADE (a tap): nine bell notes falling down the chord, from two octaves over C4 to C4, softer as they go |
-| SEQ | SWELL (held): the layers join one a beat and it opens up (GLOW +32 over a bar); let go, they leave one a beat |
-
-### WARP (REC)
+### WARP (HOME)
 
 Held, the music glides into slow motion: Haave's clock to half speed over about a second (the notes, the arpeggios,
 the chords and TIDE, PUMP's beat and MOTION's drift with it); let go, it glides back. The echoes keep their time
 (the delay jumps rather than glides on a tempo change: a bend would click, or detune them against the chords), and
-the sounds' own LFOs theirs. REC lights and WARP shows on the screen meanwhile.
+the sounds' own LFOs theirs. HOME lights and WARP shows on the screen meanwhile.
 
 ### Punch-in effects (FX SCL ENV LFO EDIT GLO)
 
 Hold a button and its effect plays on the whole sound; let go and it returns, like a DJ in a live
-set (after the Pocket Operator KO-33). While the music plays they snap to the beat: a press starts
-the effect on the next beat, a release ends it at the end of the beat it is in, and a quick tap plays
-one beat. Stopped, they act at once. The button lights while held and the effect's name shows in the
-middle of the screen. ECHOES, FREEZE, SHIMMER and WASH are Felucca's own performance effects (`perform.c`) on the
-master; PUMP is HAAVE's (`haave_gain_block`: on each beat the whole sound dips −8 dB in ~20 ms and swells back over
-three quarters of the beat, about 14 dB between the dip and the swell), and SWIRL is `perform.c`'s PHASER at its full
-depth (MOTION's softer one steps aside for FREEZE and SHIMMER, whose depth it shares).
+set (after the Pocket Operator KO-33), but gently: each fades in over a beat and out over a beat (`haave_punch_block`,
+at the tempo now). While the music plays they snap to the beat: a press starts the fade in on the next beat, a release
+the fade out at the end of the beat it is in, and a quick tap plays one beat. The button lights while it plays and its
+name shows in the middle of the screen. FREEZE and SHIMMER are Felucca's own performance effects (`perform.c`), held
+from the start of their fade in to the end of their fade out, their level `perf_haave_lvl`; SWIRL is `perform.c`'s
+PHASER, its depth rising (MOTION's softer one under it, both resting under FREEZE and SHIMMER, whose shimmer shares that
+depth); WASH, PUMP and BREATHE are HAAVE's.
 
 | Button | Effect |
 |---|---|
-| FX | ECHOES: everything thrown into the delay, the repeats lifted |
-| SCL | PUMP: a soft sidechain breath, the whole sound dipping on every beat and swelling back |
+| FX | WASH: every part's reverb send up to full and the dry sound down to 40 %: everything drifting into the room |
+| SCL | PUMP: a soft sidechain breath (`haave_gain_block`: on each beat the whole sound dips −8 dB in ~20 ms and swells back over three quarters of the beat, about 14 dB between the dip and the swell) |
 | ENV | FREEZE: the moment holds |
 | LFO | SHIMMER: an octave above, beside itself |
 | EDIT | SWIRL: a deep, slow phaser through everything |
-| GLO | WASH: everything thrown into the reverb |
+| GLO | BREATHE: the layers but the pad rest (their notes ring out) and GLOW goes down 24; let go, they come back |
 
 ### Chords (black keys)
 
-Every black key is a chord of the key you are in, so any of them fits at any time. Press one and the
-music moves to that chord. It lasts as long as TIDE's chords do (CALM 4 bars, FLOWING 2, WANDERING 1),
+The first five black keys are chords of the key you are in, so any of them fits at any time. Press one and the
+music moves to that chord; press the one sounding again for its coloured version (add9, or m7 on a minor chord), and
+again for plain. It lasts as long as TIDE's chords do (CALM 4 bars, FLOWING 2, WANDERING 1),
 then the chord path carries on from there (from its place in the path, when the path has it). In
 STILL it stays until the next press: there the black keys are your chord changes. Letting go does
 nothing.
 
 | Black keys, from the left | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|
-| First five | vi | ii | IV | V | I |
-| Next five | vi add9 | ii add9 | IV add9 | V add9 | I add9 |
+| Major worlds | vi | ii | IV | V | I |
+| Minor worlds | VI | iv | v | VII | i |
 
-The 11th black key starts the pattern again. While the music plays, the black key of the chord
-sounding now is lit, so you can see where you are.
+While the music plays, the black key of the chord sounding now is lit, so you can see where you are. The other six
+are the sprinkles (above).
 
 ### Behaviours (ALGORITHM)
 

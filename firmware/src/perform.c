@@ -98,6 +98,10 @@ static volatile uint32_t kb_mask;     /* main: the button bits whose hold makes 
 static volatile uint8_t kb_lock;      /* main: a layer locked open (#83, no button held): 1 keys are the layer's, 2 FX's */
 static volatile uint8_t perf_solo;    /* main: tracks soloed in the GLO layer (the others muted as by a black key) */
 static volatile uint8_t perf_kill;    /* main: every effect off (the menu, a dialog, UBOOT) */
+#if FELUCCA_HAAVE
+static volatile int32_t perf_haave_lvl = 32768;   /* HAAVE (haave_play.c): the buffer effects' and the harmonizer's
+                                                   * level, Q15, in place of DEPTH (FREEZE and SHIMMER fade in and out) */
+#endif
 static volatile int8_t perf_k[4];     /* main: the knob macros, 0 = untouched: FILTER -100..100 (- LPF, + HPF),
                                        * CRUSH 0..100, THROW 0..100, DEPTH cut 0..100 (the buffer effects' level) */
 static volatile uint32_t kb_layer;    /* ISR: the keys held that are the layer's, a bit per key */
@@ -623,7 +627,11 @@ static inline void perf_buf(int32_t *pl, int32_t *pr)
         perf_harm(l, r, &yl, &yr);
         on = 2;                                     /* (KNOB 4 is the shimmer: the level stays full) */
     }
+#if FELUCCA_HAAVE
+    pf.tw = on && pf.src != PF_N ? perf_haave_lvl : 0;
+#else
     pf.tw = on && pf.src != PF_N ? on == 2 ? 32768 : 32768 - perf_k[3] * 327 : 0;
+#endif
     pf.w += clamp(pf.tw - pf.w, -SL_SLOPE, SL_SLOPE);
     if (pf.w) {
         *pl = pf_mix(l, yl, pf.w);

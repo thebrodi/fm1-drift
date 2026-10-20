@@ -32,16 +32,17 @@ If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelto
 | **KNOB 3 — Glow** | A filter over everything: muffled, as if under water → bright and airy |
 | **KNOB 4 — Motion** | Still → moving: a slow phaser swirl, the sound drifting left and right, more notes |
 | **White keys 1–7** | Layers on / off (lit = playing): PAD, BASS, ARP, SPARKLE, MELODY, VOX, SHIMMER |
-| **White keys 8–9** | DRONE (a deep pad note on the chord's root) and BASS, both held while you hold the key |
-| **White keys 10–16** | Play along: hold for the notes of the chord sounding now, going up, in the world's own pad sound. Never a wrong note |
-| **Black keys** | Chords to move to (vi ii IV V I, then the same with a soft colour): press to go there |
+| **White keys 8–16** | Play along on the instrument chosen with SAVE / ARP / SEQ: notes of the chord sounding now and the ones that fit between them, going up. Never a wrong note |
+| **SAVE / ARP / SEQ** | The instrument: SYNTH (press SAVE again for its next sound: WARM, KEYS, GLASS, AIR), BELLS (the first key a GONG), BASS (punchy, one note at a time) |
+| **Black keys 1–5** | Chords to move to (vi ii IV V I): press to go there, press again for the same chord with a soft colour |
+| **Black keys 6–11** | Sprinkles: six little sounds of each world (birds, leaves, drops, chimes, a gong, a laser, a wave…) |
 | **PRESETS** | The world: GLASS, EMBER, DUSK, NIGHT, NEON, LOFI, BOWLS, GARDEN, FOREST, OCEAN, RAIN, CAVE, HANDPAN, CRYSTAL |
 | **ALGORITHM** | The behaviour: DRIFT, RIPPLE, SWELL, CHIME, PULSE |
 | **SELECT** | TIDE, how much it moves by itself: STILL, CALM, FLOWING (layers come and go now and then), WANDERING |
 | **OCT− / OCT+** | Everything an octave down / up |
-| **FX SCL ENV LFO EDIT GLO** | Punch-in effects while held, on the beat: echoes, pump (a soft sidechain breath on every beat), freeze, shimmer, swirl (a deep phaser), wash |
-| **HOME SAVE ARP SEQ** | Moments, from the next beat: hold SEQ to swell (the layers join and it opens up) or SAVE to breathe (only the pad, darker), let go and it settles back; tap ARP for a cascade of falling bell notes, HOME for the first chord |
-| **REC** | WARP while held: the music glides to half speed, and back when let go |
+| **FX SCL ENV LFO EDIT GLO** | Punch-in effects while held, from the beat, each fading in and out over a beat: wash, pump (a soft sidechain breath on every beat), freeze, shimmer, swirl (a deep phaser), breathe (only the pad) |
+| **HOME** | WARP while held: the music glides to half speed, and back when let go |
+| **REC** | Nothing yet |
 
 The worlds range from glassy bells and warm electric piano to a dark minor pad, 80s strings, lo-fi keys, a singing
 bowl over a drone, a kalimba, a soft flute, ocean waves and rain (brown noise), a deep cave, a handpan and crystal

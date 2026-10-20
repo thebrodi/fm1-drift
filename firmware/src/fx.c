@@ -955,6 +955,8 @@ static __attribute__((noinline)) void scope_take_mix(uint32_t n)
 }
 
 #if FELUCCA_HAAVE
+/* HAAVE (haave_spr.c): the sprinkles, sounds of the world's own, into the dry mix and the echo's and reverb's sends */
+static void haave_spr_mix(int32_t *l, int32_t *r, int32_t *sd, int32_t *sv, uint32_t n);
 /* HAAVE (haave_ui.c haave_apply, SPACE): the dry mix's level, the buses' returns as they are: far away, the room stays
  * and the sound itself falls back. Q15, gliding to fx_dry_to a sample at a time (the whole way in ~0.4 s) */
 static volatile int32_t fx_dry_to = 32768;
@@ -1083,6 +1085,7 @@ static void mix_block(int32_t *out, uint32_t n)
     if (perf)
         perf_pre(mix_l, mix_r, send_d, send_r, n);
 #if FELUCCA_HAAVE
+    haave_spr_mix(mix_l, mix_r, send_d, send_r, n);     /* (before SPACE's dry level: they are in the music) */
     if (fx_dry != 32768 || fx_dry_to != 32768)
         fx_dry_block(n);                                /* (the sends taken already: only the dry part) */
 #endif
