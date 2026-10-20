@@ -269,24 +269,28 @@ The website (<https://thebrodi.github.io/fm1-haave/>) is the `gh-pages` branch: 
 build/site` puts the landing page (`web/site/index.html`), the emulator (`try/`) and the installer (`install/`, once
 there is a package) together, and that folder is pushed as the branch. Its pictures are the instrument's own screen:
 `tools/make_haave_shots.py` builds `web/emu/haave_shots.c`, which plays the firmware natively through short scenes
-(each world, the knobs, the layers, the chords, the PLAY keys, PRESETS, ALGORITHM, TIDE, a punch-in, the moments) and
+(each world, the knobs, the layers, the chords, the instruments, PRESETS, ALGORITHM, TIDE, the punch-ins, WARP, the
+sprinkles) and
 takes the screen ten times a second, and writes them as animated WebP (`img/`, about 1 MB), with the screen's font
 (Inter Tight, `fonts/`). The page's FM-1 is drawn in SVG; choosing a control shows what it does and its scene on the
 screen, and the steps walk through a first session. Build the emulator with `EMU_VERSION=haave-X.Y.Z` for the page to
 show the release.
 
 `tests/haave_test.c` plays the firmware natively: every world × behaviour with every layer on (clipping, clicks, DC,
-level band), then random playing for MINUTES (default 30): output finite and below clipping, notes in range, never
-more than 8 voices, never silent while the pad plays, silent 30–40 s after a stop. The build command is at the top of
-the file. Known rough edge: with GLOW at its maximum, OCT+ and a high ECHO, a bright chord of bells can fizz for a few
+level band); TIDE; every punch-in in every world (no click, no level jump); the instruments (every note in the chord and
+rising, in range, every world, chord, colour and OCT; each instrument and SYNTH sound heard), all 84 sprinkles (heard,
+no click, done), a chord's key again colouring it, a crowd of notes (no held note taken), nothing held ending by itself;
+WARP, PUMP, SYNTH's held notes following a chord, BREATHE; then random playing for MINUTES (default 30): output finite
+and below clipping, notes in range, never more than 8 voices, never silent while the pad plays, silent 30–40 s after a
+stop. The build command is at the top of the file. Known rough edge: with GLOW at its maximum, OCT+ and a high ECHO, a bright chord of bells can fizz for a few
 seconds (two of six random seeds catch it).
 
 `tests/haave_harmony.c` checks that everything harmonises: every world × behaviour × TIDE with every layer
 on, the notes heard together sampled continuously; a semitone between two of them (a minor 2nd, a major 7th, a minor
 9th) is a clash. It passes with none. What keeps it so: every melody note sits at least a whole tone from every note of
 the chord (its root too), the flowing line also never steps a semitone from its own last, still ringing note, and a
-minor chord's colour (the upper black keys) is its 7th, not the 9th that rubs against its minor 3rd. The scan also holds
-a black-key chord every 3 s (plain and coloured in turn); what remains (0.1 % of the time on average) is a bell still
+minor chord's colour (a chord's key pressed again) is its 7th, not the 9th that rubs against its minor 3rd. The scan
+also holds a black-key chord every 3 s (plain and coloured in turn) and presses a sprinkle every 9 s; what remains (0.1 % of the time on average) is a bell still
 ringing from the chord before as a black key changes it, like a sustain pedal held across the change. Every part of
 every world is in tune within 5 cents (the analog pads' two oscillators 8 cents apart; the granular pads whose pitch
 wanders were replaced by Haave's FM CLOUD, AIR and BLOOM pads). Every pad, bell, bass and voice is levelled to within

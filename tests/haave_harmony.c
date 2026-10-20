@@ -4,7 +4,7 @@
  * sampled every block. A clash is two notes a semitone apart (in pitch class: a minor 2nd, a major 7th, a minor 9th)
  * both heard: held, or struck within the last 0.6 s, and since the chord now began (a bell of the chord before still
  * ringing over the next is a crossfade, not a wrong note). Every 3 s a black-key chord is held for 1.5 s, the plain ones
- * and the coloured (add9 / m7) in turn. Prints the share of time with a clash, worst first, and which
+ * and the coloured (add9 / m7: the key pressed twice) in turn, and every 9 s a sprinkle. Prints the share of time with a clash, worst first, and which
  * layers clash most.
  *   cc -O2 -ffp-contract=off -w -Ibuild/gen -Ifirmware/src -Iweb/emu -o build/haave_harmony tests/haave_harmony.c -lm
  *   build/haave_harmony [SECONDS per combination]          exit 0: no combination above 3 % */
@@ -16,7 +16,8 @@ static uint32_t pair[NPART][NPART];      /* clashing blocks by the parts of the 
 static uint32_t chord_ms;                /* when the chord now began */
 
 /* the notes heard now -> n[], their parts -> pt[] */
-static const uint8_t BLACK[10] = {1, 3, 5, 8, 10, 13, 15, 17, 20, 22};   /* the black keys (from F3 = 0) */
+static const uint8_t BLACK[11] = {1, 3, 5, 8, 10, 13, 15, 17, 20, 22, 25};   /* the black keys (from F3 = 0): the
+                                                                            * first five chords, then the sprinkles */
 
 static uint32_t heard(uint8_t *n, uint8_t *pt)
 {
@@ -66,18 +67,25 @@ int main(int argc, char **argv)
                     heard(n0, p0);
                 }
                 for (k = 0; k < secs * 44100u; k += 128u) {
-                    uint32_t blk = k / 128u;                 /* every 3 s (1034 blocks) a black-key chord held for 1.5 s
-                                                              * (plain or coloured: places 0..9); between, the path's */
+                    uint32_t blk = k / 128u, ch = (blk / 1034u + w + st * 3u + pg * 7u) % 10u;
+                    /* every 3 s (1034 blocks) a black-key chord held for 1.5 s, plain (ch 0..4) or coloured (5..9: its
+                     * key pressed twice); between, the path's; and a sprinkle now and then (its bells on the chord) */
                     if (blk % 1034u == 0u)
-                        web_keys(1u << BLACK[(blk / 1034u + w + st * 3u + pg * 7u) % 10u]);
+                        web_keys(1u << BLACK[ch % 5u]);
+                    else if (blk % 1034u == 4u && ch >= 5u)
+                        web_keys(0);
+                    else if (blk % 1034u == 8u && ch >= 5u)
+                        web_keys(1u << BLACK[ch % 5u]);
                     else if (blk % 1034u == 517u)
+                        web_keys(blk % 3102u == 517u ? 1u << BLACK[5u + (blk / 3102u) % 6u] : 0u);
+                    else if (blk % 1034u == 521u)
                         web_keys(0);
                     uint8_t n[NPART * NVOICE], pt[NPART * NVOICE];
                     uint32_t c, a, b, hit = 0;
-                    static uint8_t seen_was;
+                    static int32_t chord_was = -99;
                     web_render(128);
-                    if (haave_seen != seen_was) {
-                        seen_was = haave_seen;
+                    if (haave_deg * 2 + haave_bright != chord_was) {   /* (the chord, or its colour: new) */
+                        chord_was = haave_deg * 2 + haave_bright;
                         chord_ms = fm1_ms;
                     }
                     c = heard(n, pt);

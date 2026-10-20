@@ -172,6 +172,7 @@ static int haave_spr_event(haave_spr_t *v, int first)
         v->k = K_DUST;
         v->p0 = v->p1 = 2200;
         v->q = 16000;
+        v->cb = 14000;                                   /* (each speck's edge rounded: a soft tick, not a scratch) */
         v->len = SPR_MS(haave_spr_r(1800, 2600));
         v->atk = SPR_MS(300);
         v->amp = 26000;
@@ -232,21 +233,21 @@ static int haave_spr_event(haave_spr_t *v, int first)
         break;
     case HS_CHIMES:                                      /* the bells, high, a few at random: a wind chime */
         if (first)
-            v->ev = (uint8_t)haave_spr_r(4, 6);
+            v->ev = (uint8_t)haave_spr_r(2, 4);
         v->k = K_STRIKE;
         v->note = (int32_t)haave_chord_up(haave_spr_r(3, 8), haave_lo() + 5, 8u, 96);
-        v->amp = (int32_t)haave_spr_r(40, 70);
+        v->amp = (int32_t)haave_spr_r(14, 26);
         v->len = 0;
         v->gap = SPR_MS(haave_spr_r(70, 260));
         break;
-    case HS_CASCADE:                                     /* nine bells falling down the chord, softer */
+    case HS_CASCADE:                                     /* seven bells falling down the chord, softer */
         if (first)
-            v->ev = 8;
+            v->ev = 6;
         v->k = K_STRIKE;
-        v->note = (int32_t)haave_chord_up(v->ev, haave_lo() + 5, 8u, 96);
-        v->amp = 70 - 4 * (8 - v->ev);
+        v->note = (int32_t)haave_chord_up(v->ev, haave_lo() + 5, 6u, 96);
+        v->amp = 26 - 2 * (6 - v->ev);
         v->len = 0;
-        v->gap = SPR_MS(110);
+        v->gap = SPR_MS(140);
         break;
     default:                                             /* GONG */
         v->ev = 0;
@@ -258,9 +259,9 @@ static int haave_spr_event(haave_spr_t *v, int first)
     }
     if (v->k == K_STRIKE) {                              /* (the bells: struck now) */
         if (v->note < 0)
-            haave_gong(96);
+            haave_gong(36);
         else
-            haave_strike(DL_SPARKLE, HAAVE_BELL, (uint32_t)v->note, (uint32_t)v->amp);
+            haave_strike(DL_SPARKLE | DL_USER, HAAVE_BELL, (uint32_t)v->note, (uint32_t)v->amp);
         return 1;
     }
     if (v->atk < 1u)
@@ -271,23 +272,29 @@ static int haave_spr_event(haave_spr_t *v, int first)
     v->de = v->amp / (int32_t)v->atk + 1;
     v->r = 32768;
     v->dr = (int32_t)(32768u / (v->len - v->atk)) + 1;
+    if (v->k == K_SINE)                                  /* (its start now: an event may begin inside a block) */
+        v->inc = pitch_inc((uint32_t)(v->p0 < 0 ? 0 : v->p0 > 2047 ? 2047 : v->p0));
+    else
+        v->f = v->p0 * 4668 / 1000;
     return 1;
 }
 
 /* black key 6 + k pressed: its sprinkle (a voice free, else the oldest; the same key's again from its start) */
 static void haave_spr_key(uint32_t k)
 {
-    uint32_t i, best = 0;
+    uint32_t i, best = SPR_NV;
     uint8_t type = HAAVE_SPR[haave_spr_world % 14u][k % 6u];
     haave_spr_t *v;
-    for (i = 0; i < SPR_NV; i++) {
-        if (haave_spr[i].type != 0xFF && haave_spr[i].slot == k) {
+    for (i = 0; i < SPR_NV && best == SPR_NV; i++)       /* the same key's, playing */
+        if (haave_spr[i].type != 0xFF && haave_spr[i].slot == k)
             best = i;
-            break;
-        }
-        if (haave_spr[i].type == 0xFF || haave_spr_age[i] < haave_spr_age[best])
+    for (i = 0; i < SPR_NV && best == SPR_NV; i++)       /* else a free one */
+        if (haave_spr[i].type == 0xFF)
             best = i;
-    }
+    if (best == SPR_NV)                                  /* else the oldest */
+        for (i = best = 0; i < SPR_NV; i++)
+            if (haave_spr_age[i] < haave_spr_age[best])
+                best = i;
     v = &haave_spr[best];
     memset(v, 0, sizeof *v);
     v->type = type;
@@ -302,8 +309,8 @@ static void haave_spr_key(uint32_t k)
 
 /* fx.c: a block of the sprinkles into the dry mix (l, r) and the echo's and reverb's sends (sd, sv); each kind at its
  * level beside the music (Q8: noise through a narrow band, sparse specks and low rumbles need more than a sine) */
-#define SPR_GAIN 36000
-static const uint16_t SPR_KIND_GAIN[HS_N] = {256, 256, 230, 720, 640, 256, 256, 320, 2600, 1020, 750, 2040, 510,
+#define SPR_GAIN 22700                   /* (about 4 dB under the instruments' level beside the pad) */
+static const uint16_t SPR_KIND_GAIN[HS_N] = {256, 256, 230, 720, 640, 256, 256, 320, 3100, 1020, 750, 2040, 510,
                                              256, 256, 256};
 static void haave_spr_mix(int32_t *l, int32_t *r, int32_t *sd, int32_t *sv, uint32_t n)
 {

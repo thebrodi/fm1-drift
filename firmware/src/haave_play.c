@@ -3,24 +3,27 @@
 /* HAAVE: the music, in the audio ISR (seq.c events_block calls haave_block where Felucca's keyboard_block was).
  * Included by seq.c with FELUCCA_HAAVE. HAAVE.md has the design.
  *   PLAY: a chord progression (SELECT) walks on by itself on a sixteenth-note clock at the world's tempo.
- *   White keys: toggle the seven layers (PAD BASS ARP SPARKLE MELODY CHOIR SHIMMER), repeating across the keyboard.
- *   Black keys: chords to jump to (vi ii IV V I from the left; the upper ones the same chords, coloured): pressed, the
- *   music moves there, for as long as TIDE's chords last (STILL: until the next), then its path carries on from there.
+ *   White keys 1..7: toggle the seven layers (PAD BASS ARP SPARKLE MELODY CHOIR SHIMMER); 8..16: the instrument
+ *   (SAVE ARP SEQ, haave_ui.c: SYNTH BELLS BASS), every note fitting the chord.
+ *   Black keys 1..5: chords to jump to (vi ii IV V I; again: the same, coloured): pressed, the music moves there, for
+ *   as long as TIDE's chords last (STILL: until the next), then its path carries on from there; 6..11: the world's
+ *   sprinkles (haave_spr.c, included at the end).
  *   ALGORITHM: how every layer behaves (DS_*: how long a chord lasts, how often each layer plays).
- *   FX SCL ENV LFO EDIT GLO: punch-in effects on the whole sound while held (Felucca's perform.c effects, on the master):
- *   ECHOES (ECHO THROW), STUTTER (REPEAT 1/16), FREEZE, SHIMMER (OCT UP), UNDERWATER (the LPF sweeping down over a bar,
- *   to a soft muffle: perform.c PF_LPF_END), WASH (REV THROW). While the music plays they snap to the beat: a press
- *   starts its effect on the next beat, a release ends it at the end of the beat it is in (a tap: one beat).
+ *   FX SCL ENV LFO EDIT GLO: punch-in effects on the whole sound while held, fading in and out over a beat (WASH PUMP
+ *   FREEZE SHIMMER SWIRL BREATHE: haave_punch_block). While the music plays they snap to the beat: a press starts its
+ *   effect on the next beat, a release ends it at the end of the beat it is in (a tap: one beat). HOME: WARP.
  * Every note comes from the scale of the world (major or natural minor, from haave_root) and mostly from the chord
  * sounding now: nothing can clash.
- * Parts: PAD and SHIMMER on part 1, ARP SPARKLE MELODY on part 2 (struck bells), BASS on 3, CHOIR on 4. The FM-1
- * sounds 8 voices across the parts (core.h NVOICE), so the held layers use at most 6 (pad 3, shimmer 1, bass 1,
- * choir 1) and leave the bells room. */
+ * Parts: PAD and SHIMMER on part 1, ARP SPARKLE MELODY on part 2 (struck bells), BASS on 3, CHOIR on 4; the instrument
+ * borrows one (SYNTH 4, BELLS 2, BASS 3). The FM-1 sounds 8 voices across the parts (core.h NVOICE): the held layers
+ * use at most 6 (pad 3, shimmer 1, bass 1, choir 1), the instrument what is left but one, a layer's bell steps aside
+ * when none is free (haave_strike), and a held note the budget takes anyway comes back (haave_heal). */
 #define HAAVE_PAD 0u
 #define HAAVE_BELL 1u
 #define HAAVE_BASS 2u
 #define HAAVE_CHOIR 3u
 enum { DL_PAD, DL_BASS, DL_ARP, DL_SPARKLE, DL_MELODY, DL_CHOIR, DL_SHIMMER, DL_N };
+#define DL_USER 0x80u                    /* (with a layer, to haave_strike: a note played by hand, never skipped) */
 static const char *const HAAVE_LAYER[DL_N] = {"PAD", "BASS", "ARP", "SPARK", "MEL", "VOX", "SHIM"};
 /* the chord of each black key of a group: major vi ii IV V I, minor VI iv v VII i (no diminished chord in either) */
 static const int8_t HAAVE_BLACK[2][5] = {{5, 1, 3, 4, 0}, {5, 3, 4, 6, 0}};
@@ -212,9 +215,11 @@ static uint32_t haave_ngated(void)       /* the voices held now, every part */
 static uint32_t haave_heals;             /* (how many: the tests) */
 static void haave_heal(void)
 {
-    haave_held_t *const H[4] = {&haave_pad, &haave_bass, &haave_choir, &haave_kpad};
+    haave_held_t *const H[3] = {&haave_pad, &haave_bass, &haave_choir};   /* (not the instrument's: a held note of a
+                                                                         * sound that fades by itself, KEYS, ends there,
+                                                                         * as a key held on a piano) */
     uint32_t h, j;
-    for (h = 0; h < 4u; h++) {
+    for (h = 0; h < 3u; h++) {
         track_t *t = &trk[H[h]->part];
         if (t->xf_on || t->eng_req != t->engine)         /* (a sound change: its notes come after the fade) */
             continue;
@@ -251,7 +256,8 @@ static void haave_room(void)
 }
 static void haave_strike(uint32_t layer, uint32_t part, uint32_t note, uint32_t vel)
 {
-    uint32_t i, k = 0;
+    uint32_t i, k = 0, user = layer & DL_USER;
+    layer &= ~DL_USER;
     haave_act[layer] = 255;
 #ifdef HAAVE_TRACE
     printf("%7.2f s  %-6s  part %u  note %3u  vel %3u\n", fm1_ms / 1000.0, HAAVE_STYLE[haave_style], part + 1u, note,
@@ -268,6 +274,9 @@ static void haave_strike(uint32_t layer, uint32_t part, uint32_t note, uint32_t 
         return;
     }
     haave_room();
+    if (!user && haave_ngated() >= NVOICE)
+        return;                                      /* (still none free: a layer's bell steps aside rather than take
+                                                      * a held note; a bell played by hand never) */
     for (i = 0; i < HAAVE_NBELL; i++) {              /* a free slot, else the one closest to its end */
         if (!haave_bn[i] || haave_bn[i] == note) {
             k = i;
@@ -560,8 +569,8 @@ static void haave_keys_held(void)
 static void haave_gong(uint32_t vel)
 {
     uint32_t n = (uint32_t)haave_fold(haave_root + haave_step(haave_cur), haave_lo() - 12);
-    haave_strike(DL_MELODY, HAAVE_BELL, n, vel);
-    haave_strike(DL_MELODY, HAAVE_BELL, n + 12u, vel / 2u);
+    haave_strike(DL_MELODY | DL_USER, HAAVE_BELL, n, vel);
+    haave_strike(DL_MELODY | DL_USER, HAAVE_BELL, n + 12u, vel / 2u);
 }
 
 static void haave_spr_key(uint32_t k);   /* (haave_spr.c) */
@@ -591,7 +600,7 @@ static void haave_keys_block(void)
                 haave_kage[i] = ++haave_kseq;
                 if (haave_inst == DI_BELLS) {
                     if (i)
-                        haave_strike(DL_MELODY, HAAVE_BELL, haave_key_note(i), 74);
+                        haave_strike(DL_MELODY | DL_USER, HAAVE_BELL, haave_key_note(i), 74);
                     else
                         haave_gong(100);
                 }

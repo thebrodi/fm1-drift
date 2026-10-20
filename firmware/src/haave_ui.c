@@ -462,10 +462,10 @@ static void haave_input(void)
 }
 
 /* -------------------------------------------------------------- LEDs --- */
-/* white keys: the seven layers lit while they play, GONG BASS and the PLAY keys while held (GONG and BASS a little
- * brighter than the glow); black keys: lit while held, and the one whose chord sounds now; every key is dimly lit; PLAY
- * green while the music plays, breathing while it is stopped; the moment and punch-in buttons lit while theirs plays;
- * OCT- / OCT+ lit while shifted */
+/* white keys: the seven layers lit while they play (breathing while their part plays the instrument), the
+ * instrument's keys while held; black keys: the chords lit while held, and the one sounding now; the sprinkles while
+ * they sound; every key is dimly lit; PLAY green while the music plays, breathing while it is stopped; SAVE ARP SEQ the
+ * instrument chosen; the punch-ins while they play; HOME while WARP; OCT- / OCT+ while shifted */
 static void haave_leds(void)
 {
     uint8_t nl[FM1_NCOL] = {0}, nd[FM1_NCOL] = {0}, nm[FM1_NCOL] = {0}, nb[FM1_NCOL] = {0};
