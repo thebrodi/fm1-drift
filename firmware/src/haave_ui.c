@@ -74,7 +74,7 @@ static const haave_world_t HAAVE_WORLDS[] = {
     {"FOREST", 4, 1, 58, {{ENGI_FM6, FM6_PAD, DF_AIR, 104}, {ENGI_WHEEL, WH_SOFT_FLUTE, NO_PATCH, 122}, SUB},
      {FO_WHISPER, {120, 100, 90, 0, 24, 92, 54, 0}, 0, 99},        /* a breathy "hoo", like wind */
      RV_HALL, 76, DT_4D, 44, DS_DRIFT, 5},
-    {"OCEAN", 2, 0, 54, {{ENGI_NOISE, NZ_WIND, NO_PATCH, 123}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 112}, SUB},
+    {"OCEAN", 2, 0, 54, {{ENGI_NOISE, NZ_WIND, NO_PATCH, 123}, {ENGI_FM6, FM6_BELL, DF_CLEAR_BELL, 106}, SUB},
      {FO_CHOIR, {100, 95, 0, -3, 40, 20, 56, 0}, -12, 86},          /* a low "ooh" under the waves */
      RV_HALL, 80, DT_2, 36, DS_DRIFT, 2},
     {"RAIN", 4, 1, 62, {{ENGI_NOISE, NZ_RAIN, NO_PATCH, 111}, {ENGI_FM6, FM6_MARIMBA, DF_KALIMBA, 118}, SUB},
@@ -239,9 +239,15 @@ static const haave_sound_t HAAVE_SYNTH[DY_N] = {
     {ENGI_ANALOG, AN_SINE_KEY, NO_PATCH, 91},            /* a glassy sine */
     {ENGI_WHEEL, WH_SOFT_FLUTE, NO_PATCH, 106},          /* a breathy flute */
 };
-static const uint8_t HAAVE_SYNTH0[14] = {DY_KEYS, DY_WARM, DY_KEYS, DY_WARM, DY_WARM, DY_WARM, DY_GLASS, DY_AIR,
-                                         DY_GLASS, DY_GLASS, DY_KEYS, DY_WARM, DY_GLASS, DY_KEYS};
-static const haave_sound_t HAAVE_BASS_PUNCH = {ENGI_ANALOG, AN_SQR_BASS, NO_PATCH, 100};   /* BASS's: plucked */
+/* each world's SYNTH to start with (not its bells' kind: CRYSTAL and RAIN the glassy sine, as OCEAN), and how it
+ * starts there: its level (LEVEL steps, 2 a dB) and attack (CAVE: softer, slower) */
+static const struct { uint8_t synth; int8_t level, atk; } HAAVE_SYNTH0[14] = {
+    {DY_KEYS, 0, 24}, {DY_WARM, 0, 24}, {DY_KEYS, 0, 24}, {DY_WARM, 0, 24}, {DY_WARM, 0, 24}, {DY_WARM, 0, 24},
+    {DY_GLASS, 0, 24}, {DY_AIR, 0, 24}, {DY_GLASS, 0, 24}, {DY_GLASS, 0, 24}, {DY_GLASS, 0, 24}, {DY_WARM, -9, 52},
+    {DY_GLASS, 0, 24}, {DY_GLASS, 0, 24}};
+/* BASS's: the same soft bass in every world, a triangle through a low filter, no resonance or drive (the square's
+ * honk gone), starting gently */
+static const haave_sound_t HAAVE_BASS_SOFT = {ENGI_ANALOG, AN_SQR_BASS, NO_PATCH, 94};
 static volatile uint8_t haave_synth;     /* SYNTH's sound now (DY_*) */
 static uint8_t haave_p4 = 0xFF, haave_p3 = 0xFF;   /* what parts 4 and 3 hold: 0 the world's, else SYNTH's 1 + DY_* /
                                                     * BASS's 1 */
@@ -270,7 +276,9 @@ static void haave_inst_load(int force)
     if (force || p4 != haave_p4) {
         if (p4) {
             track_t *t = &trk[HAAVE_CHOIR];
-            haave_part(t, &HAAVE_SYNTH[p4 - 1u], 24, 112, 84);   /* (a soft start, a long tail) */
+            haave_sound_t y = HAAVE_SYNTH[p4 - 1u];
+            y.level = (uint8_t)(y.level + HAAVE_SYNTH0[haave_world % 14u].level);   /* (the world's: CAVE quieter) */
+            haave_part(t, &y, HAAVE_SYNTH0[haave_world % 14u].atk, 112, 84);   /* (a soft start, a long tail) */
             t->p[P_GLIDE] = 0;
             t->p[P_PAN] = -12;
             if (p4 - 1u == DY_WARM)
@@ -281,9 +289,15 @@ static void haave_inst_load(int force)
         m |= 1u << HAAVE_CHOIR;
     }
     if (force || p3 != haave_p3) {
-        if (p3)
-            haave_part(&trk[HAAVE_BASS], &HAAVE_BASS_PUNCH, 0, 70, 40);   /* (a pluck: at once, falling, short) */
-        else
+        if (p3) {
+            track_t *t = &trk[HAAVE_BASS];
+            haave_part(t, &HAAVE_BASS_SOFT, 10, 100, 50);   /* (a gentle start, held, a short tail) */
+            t->p[P_E0 + 0] = 2;                          /* WAVE: TRI */
+            t->p[P_E0 + 4] = 46;                         /* CUT: low, round */
+            t->p[P_E0 + 5] = 6;                          /* RES */
+            t->p[P_E0 + 6] = 0;                          /* DRV */
+            t->p[P_E0 + 7] = 40;                         /* KTR */
+        } else
             haave_part(&trk[HAAVE_BASS], &d->part[2], 40, 120, 90);
         haave_p3 = p3;
         m |= 1u << HAAVE_BASS;
@@ -326,7 +340,7 @@ static void haave_load(uint32_t w)
     trk[HAAVE_PAD].p[P_DEC] = 90;
     haave_part(&trk[HAAVE_BELL], &d->part[1], 0, 127, 100);     /* struck: its own decay, a long release */
     trk[HAAVE_BELL].p[P_PAN] = 20;
-    haave_synth = HAAVE_SYNTH0[haave_world % 14u];       /* (each world's own SYNTH to start with) */
+    haave_synth = HAAVE_SYNTH0[haave_world % 14u].synth;   /* (each world's own SYNTH to start with) */
     haave_inst_load(1);                                  /* (the bass and the voice, or the instrument's) */
     haave_spr_world = haave_world;
     haave_root = d->root;

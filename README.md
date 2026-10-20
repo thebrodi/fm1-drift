@@ -33,7 +33,7 @@ If you want everything the FM-1 can do, use [Felucca](https://github.com/hugelto
 | **KNOB 4 — Motion** | Still → moving: a slow phaser swirl, the sound drifting left and right, more notes |
 | **White keys 1–7** | Layers on / off (lit = playing): PAD, BASS, ARP, SPARKLE, MELODY, VOX, SHIMMER |
 | **White keys 8–16** | Play along on the instrument chosen with SAVE / ARP / SEQ: notes of the chord sounding now and the ones that fit between them, going up. Never a wrong note |
-| **SAVE / ARP / SEQ** | The instrument: SYNTH (press SAVE again for its next sound: WARM, KEYS, GLASS, AIR), BELLS (the first key a GONG), BASS (punchy, one note at a time) |
+| **SAVE / ARP / SEQ** | The instrument: SYNTH (press SAVE again for its next sound: WARM, KEYS, GLASS, AIR), BELLS (the first key a GONG), BASS (soft and round, the same in every world, one note at a time) |
 | **Black keys 1–5** | Chords to move to (vi ii IV V I): press to go there, press again for the same chord with a soft colour |
 | **Black keys 6–11** | Sprinkles: six little sounds of each world (birds, leaves, drops, chimes, a gong, a laser, a wave…) |
 | **PRESETS** | The world: GLASS, EMBER, DUSK, NIGHT, NEON, LOFI, BOWLS, GARDEN, FOREST, OCEAN, RAIN, CAVE, HANDPAN, CRYSTAL |

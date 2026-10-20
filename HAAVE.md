@@ -76,9 +76,9 @@ name a moment on the screen), and every note fits:
 
 | Button | Instrument | The nine keys |
 |---|---|---|
-| SAVE | SYNTH: its own sound on part 4, each world starting on its own; SAVE again: the next (WARM a soft saw lead, KEYS soft electric keys, GLASS a glassy sine, AIR a breathy flute). The VOX layer rests meanwhile | The chord's scale from about C4 up: the key's notes that fit the chord now (a whole tone at least from each of its tones), about five an octave, so nine keys are about two octaves. Held while the key is, as many as the voices allow (the latest pressed first) |
+| SAVE | SYNTH: its own sound on part 4, each world starting on its own (never its bells' kind: CRYSTAL, RAIN and OCEAN the glassy sine; CAVE's softer and slower to start); SAVE again: the next (WARM a soft saw lead, KEYS soft electric keys, GLASS a glassy sine, AIR a breathy flute). The VOX layer rests meanwhile | The chord's scale from about C4 up: the key's notes that fit the chord now (a whole tone at least from each of its tones), about five an octave, so nine keys are about two octaves. Held while the key is, as many as the voices allow (the latest pressed first) |
 | ARP | BELLS: the world's bells (part 2), struck and ringing out | The first: the GONG (the chord's root low, its octave softly above); then the chord's tones from about C4 up, eight of them |
-| SEQ | BASS: a plucked square bass on part 3; the BASS layer rests meanwhile | The chord's scale from E1 .. E2 up (whatever OCT), one note at a time, the latest held |
+| SEQ | BASS: a soft, round bass on part 3, the same in every world (a triangle through a low filter, no resonance or drive); the BASS layer rests meanwhile | The chord's scale from E1 .. E2 up (whatever OCT), one note at a time, the latest held |
 
 Held notes follow the chord: a chord change moves them to the new one's. The keys light while held, and play when the
 music is stopped too. Changing the instrument changes the borrowed part's sound (Felucca's own gentle release, then

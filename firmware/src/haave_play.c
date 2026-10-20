@@ -467,7 +467,7 @@ static void haave_jump(int32_t d, uint32_t bright)
 /* the white keys: the first seven the layers, the other nine the instrument (haave_inst), every note fitting the chord:
  *   SYNTH  the chord's scale (its steps that fit the chord, about five an octave) from C4 up, held while the key is
  *   BELLS  the first the GONG, then the chord's tones from C4 up, struck
- *   BASS   the chord's scale in the bass, from E1 .. E2 up, one at a time (the latest held), punchy
+ *   BASS   the chord's scale in the bass, from E1 .. E2 up, one at a time (the latest held), soft and round
  * held notes follow the chord: a chord change moves them to the new one's; the black keys: the first five the chords
  * (again: the same one coloured), the other six the sprinkles (haave_spr.c) */
 #define DW_INST 7u

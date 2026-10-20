@@ -211,9 +211,9 @@ static int haave_spr_event(haave_spr_t *v, int first)
         if (first)
             v->ev = 2;
         v->k = K_NOISE;
-        v->p0 = v->p1 = (int32_t)haave_spr_r(110, 200);
+        v->p0 = v->p1 = (int32_t)haave_spr_r(160, 260);  /* (a small speaker plays it: not much lower) */
         v->q = 30000;
-        v->ca = 1500;                                    /* (brown noise, the low-pass out: a rumble, nothing above) */
+        v->ca = 2200;                                    /* (brown noise, the low-pass out: a rumble, nothing above) */
         v->lpo = 1;
         v->len = SPR_MS(haave_spr_r(900, 1600));
         v->atk = SPR_MS(150);
@@ -310,7 +310,7 @@ static void haave_spr_key(uint32_t k)
 /* fx.c: a block of the sprinkles into the dry mix (l, r) and the echo's and reverb's sends (sd, sv); each kind at its
  * level beside the music (Q8: noise through a narrow band, sparse specks and low rumbles need more than a sine) */
 #define SPR_GAIN 22700                   /* (about 4 dB under the instruments' level beside the pad) */
-static const uint16_t SPR_KIND_GAIN[HS_N] = {256, 256, 230, 720, 640, 256, 256, 320, 3100, 1020, 750, 2040, 510,
+static const uint16_t SPR_KIND_GAIN[HS_N] = {256, 256, 230, 720, 640, 256, 256, 320, 3100, 1020, 750, 3600, 510,
                                              256, 256, 256};
 static void haave_spr_mix(int32_t *l, int32_t *r, int32_t *sd, int32_t *sv, uint32_t n)
 {
